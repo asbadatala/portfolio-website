@@ -7,13 +7,13 @@ import httpx
 from config import logger, jinja_env, OPENAI_API_KEY
 
 
-async def stream_openai_response(message: str, context: str = "", chat_history: str = ""):
+async def stream_speaker_response(message: str, context: str = "", chat_history: str = ""):
     """
-    Stream response from OpenAI API with optional RAG context and chat history.
+    Stream response from the Speaker Agent with RAG context and chat history.
     Yields SSE-formatted data chunks.
     """
     # Render system prompt from Jinja template
-    template = jinja_env.get_template("agent_prompt.j2")
+    template = jinja_env.get_template("speaker_prompt.j2")
     system_content = template.render(context=context, chat_history=chat_history)
     
     # Log context size (without full content to avoid spam)

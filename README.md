@@ -37,8 +37,8 @@ website/
 │   └── voice.py           # /api/voice/* (placeholder)
 │
 └── prompts/               # Jinja2 templates
-    ├── agent_prompt.j2
-    └── interpreter_prompt.j2
+    ├── speaker_prompt.j2    # Speaker Agent prompt (generates responses)
+    └── interpreter_prompt.j2 # Interpreter Agent prompt (routes messages)
 ```
 
 ## Prerequisites
@@ -132,13 +132,27 @@ website/
 
 ## How It Works
 
+### Two-Agent Architecture
+
+The chatbot uses a two-agent system for efficient routing:
+
+1. **Interpreter Agent** - Routes messages and decides if RAG is needed
+2. **Speaker Agent** - Generates responses using RAG context
+
+### Flow
+
 1. **User sends a message** → Frontend sends to `/api/chat` with optional `session_id`
-2. **Query refinement** → LLM interpreter refines the query for better search
-3. **RAG retrieval** → Vector search finds relevant chunks from portfolio documents
-4. **Context assembly** → Retrieves session history + RAG context
-5. **LLM response** → OpenAI generates response using context
-6. **Streaming** → Response streams back to frontend via SSE
-7. **History save** → User and assistant messages saved to Redis
+2. **Interpreter Agent** decides routing:
+   - **Direct Response (early exit)**: Simple greetings, farewells, acknowledgments → respond immediately
+   - **Needs Context**: Questions about Ankit → proceed to RAG
+3. **RAG retrieval** (if needed) → Vector search finds relevant chunks from portfolio documents
+4. **Speaker Agent** → Generates response using RAG context + chat history
+5. **Streaming** → Response streams back to frontend via SSE
+6. **History save** → User and assistant messages saved to Redis
+
+### Early Exit Optimization
+
+For simple conversational exchanges (greetings, thanks, etc.), the Interpreter Agent responds directly without hitting the RAG pipeline, reducing latency significantly.
 
 ## RAG Pipeline
 

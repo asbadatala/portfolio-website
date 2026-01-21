@@ -1,23 +1,25 @@
 """
 Chat flow - handles text-based conversation logic.
-Orchestrates retrieval, LLM calls, and session management for chat.
+Orchestrates routing, retrieval, LLM calls, and session management for chat.
 """
 import json
+import asyncio
 from config import logger
 from services.session import get_session_history, save_session_message, format_chat_history
-from services.retrieval import retrieve_context, refine_query_with_interpreter
-from services.llm import stream_openai_response
+from services.retrieval import retrieve_context, interpret_user_query
+from services.llm import stream_speaker_response
 
 
 class ChatFlow:
     """
-    Orchestrates the chat conversation flow.
+    Orchestrates the chat conversation flow with early exit capability.
     
     Flow:
     1. Get session history
-    2. Refine user query using interpreter LLM
-    3. Retrieve relevant context from vector store
-    4. Stream response from LLM
+    2. Interpreter Agent decides: direct response OR needs context
+    3a. If direct_response: Return immediately (early exit)
+    3b. If needs_context: Retrieve context from vector store
+    4. Stream response from Speaker Agent
     5. Save messages to session history
     """
     
@@ -47,16 +49,41 @@ class ChatFlow:
         if self.session_id:
             await save_session_message(self.session_id, "user", message)
         
-        # Step 3: Refine query using interpreter LLM
-        refined_query = await refine_query_with_interpreter(message)
+        # Step 3: Interpreter Agent decides routing
+        interpreter_result = await interpret_user_query(message)
+        action = interpreter_result.get("action", "needs_context")
+        
+        # Step 3a: Early exit for direct responses (greetings, simple queries)
+        if action == "direct_response":
+            direct_response = interpreter_result.get("response", "")
+            logger.info(f"Early exit: Direct response for '{message[:50]}...'")
+            
+            # Stream the direct response word by word to match Speaker Agent behavior
+            words = direct_response.split()
+            for i, word in enumerate(words):
+                # Add space before word (except first word)
+                chunk = f" {word}" if i > 0 else word
+                yield f"data: {json.dumps({'content': chunk})}\n\n"
+                # Small delay to simulate streaming (optional, can be removed for faster response)
+                await asyncio.sleep(0.02)  # 20ms delay between words
+            
+            yield "data: [DONE]\n\n"
+            
+            # Save assistant response to history
+            if self.session_id and direct_response:
+                await save_session_message(self.session_id, "assistant", direct_response)
+            return
+        
+        # Step 3b: Needs context - go through RAG
+        refined_query = interpreter_result.get("query", message)
         
         # Step 4: Retrieve relevant context from vector store
         context, retrieved_chunks = await retrieve_context(refined_query, k=5)
         logger.info(f"Retrieved {len(retrieved_chunks)} chunks for context")
         
-        # Step 5: Stream response and save to history
+        # Step 5: Stream response from Speaker Agent and save to history
         full_response = ""
-        async for chunk in stream_openai_response(message, context, chat_history):
+        async for chunk in stream_speaker_response(message, context, chat_history):
             yield chunk
             
             # Extract content from SSE data for saving

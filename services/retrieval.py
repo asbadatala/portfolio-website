@@ -34,11 +34,19 @@ def expand_query(query: str) -> str:
     return query
 
 
-async def refine_query_with_interpreter(user_query: str) -> str:
+async def interpret_user_query(user_query: str) -> dict:
     """
-    Use LLM to refine/interpret the user query into a better search query.
-    Handles vague questions, spelling errors, and generates concrete keywords.
+    Interpreter Agent: Routes user messages and determines if RAG is needed.
+    
+    Returns:
+        dict with:
+        - action: "direct_response" or "needs_context"
+        - response: (if direct_response) The response to send directly
+        - query: (if needs_context) The refined query for RAG search
     """
+    # Default fallback: always go through RAG
+    fallback_result = {"action": "needs_context", "query": user_query}
+    
     try:
         # Render interpreter prompt
         template = jinja_env.get_template("interpreter_prompt.j2")
@@ -57,7 +65,7 @@ async def refine_query_with_interpreter(user_query: str) -> str:
                         {"role": "system", "content": interpreter_prompt},
                         {"role": "user", "content": user_query}
                     ],
-                    "max_completion_tokens": 300,
+                    "max_completion_tokens": 400,
                     "reasoning_effort": "low",
                 },
                 timeout=10.0
@@ -66,16 +74,16 @@ async def refine_query_with_interpreter(user_query: str) -> str:
             if response.status_code != 200:
                 error_text = await response.aread()
                 error_msg = error_text.decode('utf-8') if error_text else "Unknown error"
-                logger.warning(f"Interpreter API error ({response.status_code}): {error_msg}, using original query")
-                return user_query
+                logger.warning(f"Interpreter API error ({response.status_code}): {error_msg}, falling back to RAG")
+                return fallback_result
             
             result = response.json()
             logger.info(f"Interpreter API response structure: choices={len(result.get('choices', []))}")
             
             choices = result.get("choices", [])
             if not choices:
-                logger.warning("No choices in interpreter response, using original query")
-                return user_query
+                logger.warning("No choices in interpreter response, falling back to RAG")
+                return fallback_result
             
             message = choices[0].get("message", {})
             content = message.get("content", "").strip()
@@ -89,10 +97,10 @@ async def refine_query_with_interpreter(user_query: str) -> str:
             
             if not content:
                 if reasoning_tokens > 0 and reasoning_tokens >= completion_tokens * 0.9:
-                    logger.warning(f"Model used {reasoning_tokens}/{completion_tokens} tokens for reasoning with no output. Finish reason: {finish_reason}, using original query")
+                    logger.warning(f"Model used {reasoning_tokens}/{completion_tokens} tokens for reasoning with no output. Finish reason: {finish_reason}, falling back to RAG")
                 else:
-                    logger.warning(f"Empty content in interpreter response. Finish reason: {finish_reason}, using original query")
-                return user_query
+                    logger.warning(f"Empty content in interpreter response. Finish reason: {finish_reason}, falling back to RAG")
+                return fallback_result
             
             # Parse JSON response
             try:
@@ -107,16 +115,29 @@ async def refine_query_with_interpreter(user_query: str) -> str:
                     content = content[json_start:json_end].strip()
                 
                 parsed = json.loads(content)
-                refined_query = parsed.get("query", user_query)
-                logger.info(f"Query refined: '{user_query}' -> '{refined_query}'")
-                return refined_query
+                action = parsed.get("action", "needs_context")
+                
+                if action == "direct_response":
+                    direct_response = parsed.get("response", "")
+                    if direct_response:
+                        logger.info(f"Interpreter: DIRECT_RESPONSE for '{user_query[:50]}...'")
+                        return {"action": "direct_response", "response": direct_response}
+                    else:
+                        logger.warning("Interpreter returned direct_response but no response text, falling back to RAG")
+                        return fallback_result
+                else:
+                    # needs_context
+                    refined_query = parsed.get("query", user_query)
+                    logger.info(f"Interpreter: NEEDS_CONTEXT - Query refined: '{user_query}' -> '{refined_query}'")
+                    return {"action": "needs_context", "query": refined_query}
+                    
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse interpreter JSON: {content[:200]}, error: {e}, using original query")
-                return user_query
+                logger.warning(f"Failed to parse interpreter JSON: {content[:200]}, error: {e}, falling back to RAG")
+                return fallback_result
                 
     except Exception as e:
-        logger.warning(f"Error in query interpreter: {e}, using original query")
-        return user_query
+        logger.warning(f"Error in interpreter: {e}, falling back to RAG")
+        return fallback_result
 
 
 async def retrieve_context(query: str, k: int = 5) -> tuple[str, list]:
