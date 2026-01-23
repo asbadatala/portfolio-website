@@ -29,6 +29,7 @@ class ChatFlow:
     async def process_message(self, message: str):
         """
         Process a user message and return a streaming response generator.
+        Optimized with parallelization for reduced latency.
         
         Args:
             message: The user's message
@@ -38,19 +39,22 @@ class ChatFlow:
         """
         logger.info(f"Chat flow processing (session: {self.session_id}): {message[:100]}...")
         
-        # Step 1: Get chat history for context
-        history = await get_session_history(self.session_id) if self.session_id else []
+        # OPTIMIZATION: Get session history first (needed for interpreter to understand follow-ups)
+        if self.session_id:
+            history = await get_session_history(self.session_id)
+        else:
+            history = []
         chat_history = format_chat_history(history, max_exchanges=5)
         
         if chat_history:
             logger.info(f"Including {len(history)} messages from session history")
         
-        # Step 2: Save user message to history
+        # OPTIMIZATION: Background save user message (non-blocking)
         if self.session_id:
-            await save_session_message(self.session_id, "user", message)
+            asyncio.create_task(save_session_message(self.session_id, "user", message))
         
-        # Step 3: Interpreter Agent decides routing
-        interpreter_result = await interpret_user_query(message)
+        # Interpreter Agent decides routing (now with chat history for follow-up understanding)
+        interpreter_result = await interpret_user_query(message, chat_history)
         action = interpreter_result.get("action", "needs_context")
         
         # Step 3a: Early exit for direct responses (greetings, simple queries)
@@ -69,21 +73,23 @@ class ChatFlow:
             
             yield "data: [DONE]\n\n"
             
-            # Save assistant response to history
+            # OPTIMIZATION: Background save assistant response (non-blocking)
             if self.session_id and direct_response:
-                await save_session_message(self.session_id, "assistant", direct_response)
+                asyncio.create_task(save_session_message(self.session_id, "assistant", direct_response))
             return
         
         # Step 3b: Needs context - go through RAG
         refined_query = interpreter_result.get("query", message)
+        # Use normalized question if available, otherwise fall back to original message
+        normalized_question = interpreter_result.get("question", message)
         
         # Step 4: Retrieve relevant context from vector store
-        context, retrieved_chunks = await retrieve_context(refined_query, k=5)
+        context, retrieved_chunks = await retrieve_context(refined_query, k=6)
         logger.info(f"Retrieved {len(retrieved_chunks)} chunks for context")
         
         # Step 5: Stream response from Speaker Agent and save to history
         full_response = ""
-        async for chunk in stream_speaker_response(message, context, chat_history):
+        async for chunk in stream_speaker_response(normalized_question, context, chat_history):
             yield chunk
             
             # Extract content from SSE data for saving
@@ -95,7 +101,7 @@ class ChatFlow:
                 except:
                     pass
         
-        # Step 6: Save assistant response to history
+        # OPTIMIZATION: Background save assistant response (non-blocking)
         if self.session_id and full_response:
-            await save_session_message(self.session_id, "assistant", full_response)
-            logger.debug(f"Saved assistant response ({len(full_response)} chars) to session {self.session_id}")
+            asyncio.create_task(save_session_message(self.session_id, "assistant", full_response))
+            logger.debug(f"Saving assistant response ({len(full_response)} chars) to session {self.session_id} in background")

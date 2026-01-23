@@ -11,7 +11,6 @@ from config import (
     OPENAI_API_KEY,
 )
 
-
 def build_section_path(metadata: dict) -> str:
     """
     Build section path from metadata headers (Header 1, Header 2, etc.)
@@ -34,7 +33,7 @@ def expand_query(query: str) -> str:
     return query
 
 
-async def interpret_user_query(user_query: str) -> dict:
+async def interpret_user_query(user_query: str, chat_history: str = "") -> dict:
     """
     Interpreter Agent: Routes user messages and determines if RAG is needed.
     
@@ -43,14 +42,15 @@ async def interpret_user_query(user_query: str) -> dict:
         - action: "direct_response" or "needs_context"
         - response: (if direct_response) The response to send directly
         - query: (if needs_context) The refined query for RAG search
+        - question: (if needs_context) The normalized user question with pronoun fixes
     """
     # Default fallback: always go through RAG
-    fallback_result = {"action": "needs_context", "query": user_query}
+    fallback_result = {"action": "needs_context", "query": user_query, "question": user_query}
     
     try:
-        # Render interpreter prompt
+        # Render interpreter prompt with chat history if available
         template = jinja_env.get_template("interpreter_prompt.j2")
-        interpreter_prompt = template.render()
+        interpreter_prompt = template.render(chat_history=chat_history)
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -60,13 +60,12 @@ async def interpret_user_query(user_query: str) -> dict:
                     "Authorization": f"Bearer {OPENAI_API_KEY}"
                 },
                 json={
-                    "model": "gpt-5-mini",
+                    "model": "gpt-4.1-nano",
                     "messages": [
                         {"role": "system", "content": interpreter_prompt},
                         {"role": "user", "content": user_query}
                     ],
                     "max_completion_tokens": 400,
-                    "reasoning_effort": "low",
                 },
                 timeout=10.0
             )
@@ -78,7 +77,6 @@ async def interpret_user_query(user_query: str) -> dict:
                 return fallback_result
             
             result = response.json()
-            logger.info(f"Interpreter API response structure: choices={len(result.get('choices', []))}")
             
             choices = result.get("choices", [])
             if not choices:
@@ -128,8 +126,9 @@ async def interpret_user_query(user_query: str) -> dict:
                 else:
                     # needs_context
                     refined_query = parsed.get("query", user_query)
-                    logger.info(f"Interpreter: NEEDS_CONTEXT - Query refined: '{user_query}' -> '{refined_query}'")
-                    return {"action": "needs_context", "query": refined_query}
+                    normalized_question = parsed.get("question", user_query)
+                    logger.info(f"Interpreter: NEEDS_CONTEXT - Query: '{refined_query}', Question: '{normalized_question}'")
+                    return {"action": "needs_context", "query": refined_query, "question": normalized_question}
                     
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to parse interpreter JSON: {content[:200]}, error: {e}, falling back to RAG")
@@ -140,15 +139,13 @@ async def interpret_user_query(user_query: str) -> dict:
         return fallback_result
 
 
-async def retrieve_context(query: str, k: int = 5) -> tuple[str, list]:
+async def retrieve_context(query: str, k: int = 6) -> tuple[str, list]:
     """
     Retrieve relevant context from Upstash vector store based on user query.
     Uses query expansion and metadata filtering for better results.
     Returns tuple of (formatted context string, list of retrieved chunks for logging).
     """
     try:
-        logger.info(f"Retrieving context for query: {query}...")
-        
         # Expand query for better matching
         expanded_query = expand_query(query)
         logger.info(f"Expanded query: {expanded_query}")
@@ -159,11 +156,12 @@ async def retrieve_context(query: str, k: int = 5) -> tuple[str, list]:
         # Try to get results with scores for ordering
         # NOTE: similarity_search_with_score returns (doc, score) where score is SIMILARITY (1.0 = identical, 0.0 = no match)
         # We sort descending so most similar chunks (score closest to 1.0) come first
+        # OPTIMIZATION: Reduced from k*3 to k*2 for faster vector search
         try:
-            docs_with_scores = vector_store.similarity_search_with_score(expanded_query, k=k*3)
+            docs_with_scores = vector_store.similarity_search_with_score(expanded_query, k=k*2)
         except (AttributeError, TypeError):
             logger.warning("similarity_search_with_score not available, using regular search")
-            docs_with_scores = [(doc, 1.0) for doc in vector_store.similarity_search(expanded_query, k=k*3)]
+            docs_with_scores = [(doc, 1.0) for doc in vector_store.similarity_search(expanded_query, k=k*2)]
         
         if not docs_with_scores:
             logger.info("No chunks retrieved from vector store")

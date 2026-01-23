@@ -29,12 +29,12 @@ async def stream_speaker_response(message: str, context: str = "", chat_history:
                 "Authorization": f"Bearer {OPENAI_API_KEY}"
             },
             json={
-                "model": "gpt-5-mini",
+                "model": "gpt-4.1-mini",
                 "messages": [
                     {"role": "system", "content": system_content},
                     {"role": "user", "content": message}
                 ],
-                "max_completion_tokens": 1000,
+                "max_completion_tokens": 1200,
                 "stream": True
             },
             timeout=60.0
@@ -64,22 +64,14 @@ async def stream_speaker_response(message: str, context: str = "", chat_history:
                             delta = choices[0].get("delta", {})
                             content = delta.get("content")
                             
-                            # Check for refusal or content filtering
-                            if "refusal" in delta:
-                                refusal_text = delta.get("refusal", "")
-                                logger.warning(f"OpenAI returned refusal: {refusal_text}")
-                            
                         if content:
                             content_chunks_yielded += 1
                             yield f"data: {json.dumps({'content': content})}\n\n"
                             
-                        # Log finish reason if present
+                        # Check for early termination (only log if problematic)
                         finish_reason = choices[0].get("finish_reason")
-                        if finish_reason:
-                            logger.info(f"Stream finished: {finish_reason} ({content_chunks_yielded} chunks)")
-                            
-                            if finish_reason == "length" and content_chunks_yielded < 10:
-                                logger.warning(f"Stream finished early ({content_chunks_yielded} chunks). System prompt may be too long.")
+                        if finish_reason == "length" and content_chunks_yielded < 10:
+                            logger.warning(f"Stream finished early ({content_chunks_yielded} chunks). System prompt may be too long.")
                     except json.JSONDecodeError:
                         pass
                     except Exception as e:

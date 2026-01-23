@@ -77,7 +77,7 @@ website/
    # Upstash Vector (for RAG)
    UPSTASH_VECTOR_REST_URL=your_upstash_vector_url
    UPSTASH_VECTOR_REST_TOKEN=your_upstash_vector_token
-   UPSTASH_NAMESPACE=portfolio_rag_v2
+   UPSTASH_NAMESPACE=portfolio_rag_v1
    
    # Upstash Redis (for session history)
    UPSTASH_REDIS_REST_URL=your_upstash_redis_url

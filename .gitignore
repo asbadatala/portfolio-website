@@ -57,3 +57,6 @@ dmypy.json
 *.tmp
 *.bak
 *.cache
+
+data_ingestion/
+prompts/
