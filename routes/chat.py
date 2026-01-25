@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from config import logger
-from flows.chat import ChatFlow
+from flows.chat import ChatFlow, SimpleChatFlow
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -39,8 +39,8 @@ async def chat(request: Request):
     if not message:
         return {"error": "Message is required"}
     
-    # Create chat flow and process message
-    flow = ChatFlow(session_id=session_id)
+    # Use simplified single-agent flow
+    flow = SimpleChatFlow(session_id=session_id)
     
     return StreamingResponse(
         flow.process_message(message),

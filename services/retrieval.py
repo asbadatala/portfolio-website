@@ -168,49 +168,51 @@ async def retrieve_context(query: str, k: int = 6) -> tuple[str, list]:
             return "", []
         
         # For work-related queries, prioritize career_summary.md
-        if any(word in query_lower for word in ["work", "job", "company", "employer", "career", "experience", "worked", "employment"]):
-            career_chunks_with_scores = [
-                (doc, score) for doc, score in docs_with_scores
-                if doc.metadata.get("file_name") == "01_career_summary.md"
-            ]
-            other_chunks_with_scores = [
-                (doc, score) for doc, score in docs_with_scores
-                if doc.metadata.get("file_name") != "01_career_summary.md"
-            ]
+        # if any(word in query_lower for word in ["work", "job", "company", "employer", "career", "experience", "worked", "employment"]):
+        #     career_chunks_with_scores = [
+        #         (doc, score) for doc, score in docs_with_scores
+        #         if doc.metadata.get("file_name") == "01_career_summary.md"
+        #     ]
+        #     other_chunks_with_scores = [
+        #         (doc, score) for doc, score in docs_with_scores
+        #         if doc.metadata.get("file_name") != "01_career_summary.md"
+        #     ]
             
-            career_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
-            other_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
+        #     career_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
+        #     other_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
             
-            selected = career_chunks_with_scores[:k] + other_chunks_with_scores[:max(0, k - len(career_chunks_with_scores))]
-            selected = selected[:k]
-            selected.sort(key=lambda x: x[1], reverse=True)
+        #     selected = career_chunks_with_scores[:k] + other_chunks_with_scores[:max(0, k - len(career_chunks_with_scores))]
+        #     selected = selected[:k]
+        #     selected.sort(key=lambda x: x[1], reverse=True)
             
-            if career_chunks_with_scores:
-                logger.info(f"Prioritized {len(career_chunks_with_scores)} chunks from career_summary.md")
+        #     if career_chunks_with_scores:
+        #         logger.info(f"Prioritized {len(career_chunks_with_scores)} chunks from career_summary.md")
         
-        # For project-related queries, prioritize projects_and_extras.md
-        elif any(word in query_lower for word in ["project", "publication"]):
-            project_chunks_with_scores = [
-                (doc, score) for doc, score in docs_with_scores
-                if doc.metadata.get("file_name") == "30_projects_and_extras.md"
-            ]
-            other_chunks_with_scores = [
-                (doc, score) for doc, score in docs_with_scores
-                if doc.metadata.get("file_name") != "30_projects_and_extras.md"
-            ]
+        # # For project-related queries, prioritize projects_and_extras.md
+        # elif any(word in query_lower for word in ["project", "publication"]):
+        #     project_chunks_with_scores = [
+        #         (doc, score) for doc, score in docs_with_scores
+        #         if doc.metadata.get("file_name") == "30_projects_and_extras.md"
+        #     ]
+        #     other_chunks_with_scores = [
+        #         (doc, score) for doc, score in docs_with_scores
+        #         if doc.metadata.get("file_name") != "30_projects_and_extras.md"
+        #     ]
             
-            project_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
-            other_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
+        #     project_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
+        #     other_chunks_with_scores.sort(key=lambda x: x[1], reverse=True)
             
-            selected = project_chunks_with_scores[:k] + other_chunks_with_scores[:max(0, k - len(project_chunks_with_scores))]
-            selected = selected[:k]
-            selected.sort(key=lambda x: x[1], reverse=True)
+        #     selected = project_chunks_with_scores[:k] + other_chunks_with_scores[:max(0, k - len(project_chunks_with_scores))]
+        #     selected = selected[:k]
+        #     selected.sort(key=lambda x: x[1], reverse=True)
             
-            if project_chunks_with_scores:
-                logger.info(f"Prioritized {len(project_chunks_with_scores)} chunks from 30_projects_and_extras.md")
+        #     if project_chunks_with_scores:
+        #         logger.info(f"Prioritized {len(project_chunks_with_scores)} chunks from 30_projects_and_extras.md")
         
-        else:
-            selected = sorted(docs_with_scores, key=lambda x: x[1], reverse=True)[:k]
+        # else:
+        #     selected = sorted(docs_with_scores, key=lambda x: x[1], reverse=True)[:k]
+
+        selected = sorted(docs_with_scores, key=lambda x: x[1], reverse=True)[:k]
         
         # Extract chunks and scores
         chunks = [doc for doc, score in selected]
@@ -239,7 +241,9 @@ async def retrieve_context(query: str, k: int = 6) -> tuple[str, list]:
             }
             retrieved_chunks.append(chunk_info)
             
-            logger.info(f"Chunk {i}: {file_name} | {section_path} | score: {score:.4f}")
+            # Log chunk with content (truncate if too long)
+            content_preview = content[:500] + "..." if len(content) > 500 else content
+            logger.info(f"Chunk {i}: {file_name} | {section_path} | score: {score:.4f}\nContent: {content_preview}")
             
             if section_path:
                 context_parts.append(f"[{i}] From {file_name} - {section_path}:\n{content}")
