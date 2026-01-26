@@ -5,12 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Marble Seam Test</title>
   <link rel="stylesheet" href="/styles.css" />
+  
+  <!-- Preload critical assets for faster rendering -->
+  <link rel="preload" href="/objects/marble-floor.webp" as="image" />
+  <link rel="preload" href="/objects/videos/marble-typing-astra.mp4" as="video" type="video/mp4" />
 </head>
 <body>
 
   <div class="frame">
     <!-- Background typing video - always playing -->
-    <video class="vid vid-bg" autoplay muted loop playsinline>
+    <video class="vid vid-bg" autoplay muted loop playsinline preload="auto">
       <source src="/objects/videos/marble-typing-astra.mp4" type="video/mp4" />
     </video>
     
