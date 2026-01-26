@@ -40,10 +40,10 @@ async def get_config():
 @app.get("/")
 async def root():
     """Serve index.html at root."""
-    return FileResponse("index.html")
+    return FileResponse("public/index.html")
 
-# Serve static files (must be after specific routes)
-app.mount("/", StaticFiles(directory="."), name="static")
+# Serve static files from public folder
+app.mount("/", StaticFiles(directory="public"), name="static")
 
 # --------------------------
 # Main Entry Point
