@@ -19,10 +19,10 @@ app = FastAPI(
 )
 
 # --------------------------
-# Include Routers
+# Include Routers (with /api prefix for local dev, matches Vercel behavior)
 # --------------------------
-app.include_router(chat_router)
-app.include_router(voice_router)
+app.include_router(chat_router, prefix="/api")
+app.include_router(voice_router, prefix="/api")
 
 # --------------------------
 # Config Endpoint
@@ -33,6 +33,10 @@ async def get_config():
     return {
         "voiceEnabled": VOICE_ENABLED
     }
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
 
 # --------------------------
 # Static File Serving

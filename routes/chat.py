@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from config import logger
 from flows.chat import ChatFlow
 
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(tags=["chat"])
 
 
 @router.post("/session")

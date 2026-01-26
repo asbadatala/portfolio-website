@@ -25,17 +25,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat_router)
-app.include_router(voice_router)
+app.include_router(chat_router, prefix="/api")
+app.include_router(voice_router, prefix="/api")
 
-@app.get("/config")
+@app.get("/api/config")
 async def get_config():
     return {"voiceEnabled": VOICE_ENABLED}
 
-@app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "ok"}
 
-@app.get("/debug")
+@app.get("/api/debug")
 async def debug():
     return {"routes": [r.path for r in app.routes]}

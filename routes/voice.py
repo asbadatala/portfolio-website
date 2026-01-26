@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request, WebSocket, HTTPException
 from config import logger, VOICE_ENABLED
 from flows.voice import VoiceFlow
 
-router = APIRouter(prefix="/api/voice", tags=["voice"])
+router = APIRouter(tags=["voice"])
 
 
 @router.post("/start")
