@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from config import logger, VOICE_ENABLED
+from config import logger
 from routes.chat import router as chat_router
 from routes.voice import router as voice_router
 
@@ -25,15 +25,8 @@ app.include_router(chat_router, prefix="/api")
 app.include_router(voice_router, prefix="/api")
 
 # --------------------------
-# Config Endpoint
+# Health Check
 # --------------------------
-@app.get("/api/config")
-async def get_config():
-    """Return frontend configuration."""
-    return {
-        "voiceEnabled": VOICE_ENABLED
-    }
-
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}

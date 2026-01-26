@@ -7,7 +7,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import VOICE_ENABLED
 from routes.chat import router as chat_router
 from routes.voice import router as voice_router
 
@@ -27,10 +26,6 @@ app.add_middleware(
 
 app.include_router(chat_router, prefix="/api")
 app.include_router(voice_router, prefix="/api")
-
-@app.get("/api/config")
-async def get_config():
-    return {"voiceEnabled": VOICE_ENABLED}
 
 @app.get("/api/health")
 async def health():

@@ -155,24 +155,6 @@
     sessionId = generateSessionId();
     console.log('Chat session initialized:', sessionId);
 
-    // Load config and show/hide call icon
-    async function loadConfig() {
-      try {
-        const response = await fetch('/api/config');
-        const config = await response.json();
-        
-        if (!config.voiceEnabled) {
-          callFab.style.display = 'none';
-        }
-      } catch (error) {
-        console.error('Failed to load config:', error);
-        // Hide call icon on error to be safe
-        callFab.style.display = 'none';
-      }
-    }
-
-    // Load config on page load
-    loadConfig();
 
     // Hide all overlay videos
     function hideAllOverlays() {
