@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from config import logger, VOICE_ENABLED
 from routes.chat import router as chat_router
@@ -34,6 +35,11 @@ app.add_middleware(
 # Include API routers
 app.include_router(chat_router)
 app.include_router(voice_router)
+
+# Root redirect - FastAPI preset doesn't auto-serve static files at /
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/index.html")
 
 # Config endpoint
 @app.get("/api/config")
