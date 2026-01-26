@@ -71,9 +71,9 @@
           <div class="example-questions">
             <button class="example-question-btn" data-question="Tell me about Ankit's most recent work experience">Tell me about Ankit's most recent work experience</button>
             <button class="example-question-btn" data-question="What are Ankit's technical skills?">What are Ankit's technical skills?</button>
-            <button class="example-question-btn" data-question="What are Ankit's hobbies?">What are Ankit's hobbies?</button>
-            <button class="example-question-btn" data-question="Would Ankit be good for a AI engineer role to build Voice AI?">Would Ankit be good for a AI engineer role to build Voice AI?</button>
-            <button class="example-question-btn" data-question="Tell me more about his leadership style">Tell me more about his leadership style</button>
+            <button class="example-question-btn" data-question="What should I ask you about if I only have 5 minutes?">What should I ask you about if I only have 5 minutes?</button>
+            <button class="example-question-btn" data-question="Would Ankit be good for an AI engineer role to build Voice AI?">Would Ankit be good for an AI engineer role to build Voice AI?</button>
+            <button class="example-question-btn" data-question="Tell me about his leadership style">Tell me about his leadership style</button>
           </div>
         </div>
       </div>
@@ -89,10 +89,13 @@
           autocomplete="off"
           required
         />
-        <button type="submit" class="chat-send-btn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button type="submit" class="chat-send-btn" id="chat-send-btn">
+          <svg class="send-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 2L11 13" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="stop-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display: none;">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
           </svg>
         </button>
       </form>
@@ -113,6 +116,9 @@
     const chatPanel = document.getElementById('chat-panel');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    const sendIcon = chatSendBtn.querySelector('.send-icon');
+    const stopIcon = chatSendBtn.querySelector('.stop-icon');
     const chatMessages = document.getElementById('chat-messages');
     const chatFab = document.getElementById('chat-fab');
     const chatCloseBtn = document.getElementById('chat-close-btn');
@@ -121,6 +127,17 @@
     
     // Call state
     let isInCall = false;
+    
+    // Chat streaming state
+    let isStreaming = false;
+    let abortController = null;
+    
+    // Toggle button between send and stop
+    function setStreamingMode(streaming) {
+      isStreaming = streaming;
+      sendIcon.style.display = streaming ? 'none' : 'block';
+      stopIcon.style.display = streaming ? 'block' : 'none';
+    }
     
     // Session management for chat history
     let sessionId = null;
@@ -277,12 +294,33 @@
       }
     }
 
+    // Handle stop button click
+    function stopStreaming() {
+      if (abortController) {
+        abortController.abort();
+        abortController = null;
+      }
+    }
+    
+    // Handle send button click (stop if streaming)
+    chatSendBtn.addEventListener('click', (e) => {
+      if (isStreaming) {
+        e.preventDefault();
+        stopStreaming();
+      }
+      // If not streaming, let the form submit naturally
+    });
+
     // Handle chat form submission with SSE streaming
     chatForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
       const message = chatInput.value.trim();
-      if (!message) return;
+      if (!message || isStreaming) return;
+      
+      // Switch to stop button mode
+      setStreamingMode(true);
+      abortController = new AbortController();
       
       // Add user message
       addMessage(message, true);
@@ -291,23 +329,27 @@
       // Show typing indicator
       showTypingIndicator();
       
+      let streamingContent = null;
+      
       try {
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message, session_id: sessionId })
+          body: JSON.stringify({ message, session_id: sessionId }),
+          signal: abortController.signal
         });
         
         if (!response.ok) {
           hideTypingIndicator();
           addMessage('Sorry, something went wrong. Please try again.', false);
+          setStreamingMode(false);
+          chatInput.focus();
           return;
         }
 
         // Read the SSE stream
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let streamingContent = null;
         let firstChunkReceived = false;
         
         while (true) {
@@ -353,10 +395,29 @@
           streamingContent.removeAttribute('id');
         }
         
+        // Switch back to send button
+        setStreamingMode(false);
+        chatInput.focus();
+        
       } catch (error) {
         hideTypingIndicator();
-        addMessage('Sorry, I couldn\'t connect to the server.', false);
+        
+        // Check if this was an abort (user clicked stop)
+        if (error.name === 'AbortError') {
+          // Remove the id so future streams don't conflict
+          if (streamingContent) {
+            streamingContent.removeAttribute('id');
+          }
+        } else {
+          addMessage('Sorry, I couldn\'t connect to the server.', false);
+        }
+        
+        // Switch back to send button
+        setStreamingMode(false);
+        chatInput.focus();
       }
+      
+      abortController = null;
     });
 
     // Handle example question button clicks

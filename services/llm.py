@@ -26,12 +26,12 @@ async def stream_unified_agent(message: str, context: str = "", chat_history: st
                 "Authorization": f"Bearer {OPENAI_API_KEY}"
             },
             json={
-                "model": "gpt-4.1-mini",
+                "model": "gpt-4.1",
                 "messages": [
                     {"role": "system", "content": system_content},
                     {"role": "user", "content": message}
                 ],
-                "max_completion_tokens": 800,
+                "max_completion_tokens": 250,
                 "stream": True
             },
             timeout=60.0
