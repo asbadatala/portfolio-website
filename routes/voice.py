@@ -6,7 +6,7 @@ NOTE: This is a placeholder for future voice integration.
 """
 from fastapi import APIRouter, Request, WebSocket, HTTPException
 
-from config import logger, VOICE_ENABLED
+from config import logger
 
 router = APIRouter(tags=["voice"])
 
@@ -25,9 +25,6 @@ async def start_voice_call(request: Request):
         - session_id: str - Session ID for the voice call
         - websocket_url: str - WebSocket URL for audio streaming
     """
-    if not VOICE_ENABLED:
-        raise HTTPException(status_code=403, detail="Voice is not enabled")
-    
     body = await request.json()
     session_id = body.get("session_id")
     
@@ -50,9 +47,6 @@ async def end_voice_call(request: Request):
     Request body:
         - session_id: str - Session ID to end
     """
-    if not VOICE_ENABLED:
-        raise HTTPException(status_code=403, detail="Voice is not enabled")
-    
     body = await request.json()
     session_id = body.get("session_id")
     
@@ -78,10 +72,6 @@ async def voice_websocket(websocket: WebSocket):
         - Uses binary frames for audio data
         - Uses text frames for control messages
     """
-    if not VOICE_ENABLED:
-        await websocket.close(code=4003, reason="Voice is not enabled")
-        return
-    
     await websocket.accept()
     logger.info("Voice WebSocket connection accepted")
     

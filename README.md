@@ -71,16 +71,12 @@ UPSTASH_NAMESPACE=portfolio_rag
 # Upstash Redis (optional, enables session history)
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
-
-# Optional UI flag (voice is currently a placeholder)
-VOICE_ENABLED=false
 ```
 
 ## API
 
 - **`POST /api/session`**: returns a session id
 - **`POST /api/chat`**: streams an SSE response (`text/event-stream`)
-- **`GET /api/config`**: returns `{"voiceEnabled": boolean}`
 - **`GET /api/health`**: health check
 
 ## How chat works (high level)
@@ -92,7 +88,7 @@ VOICE_ENABLED=false
 
 ## Notes
 
-- The voice endpoints are currently **placeholders** (UI can be toggled via `VOICE_ENABLED`).
+- The voice endpoints are currently **placeholders** (not yet implemented).
 - This project is intentionally optimized for recruiter-friendly, grounded answers about Ankit’s background (and avoids “outside knowledge” when the data isn’t present).
 
 ## Author
