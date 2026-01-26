@@ -1,6 +1,6 @@
 # Ankit’s Portfolio — AI Assistant (RAG + Streaming)
 
-Live site: **`https://ankitsdesk.vercel.app/`**
+Live site: **[https://ankitsdesk.vercel.app/](https://ankitsdesk.vercel.app/)**
 
 This repo contains the code for Ankit Badatala’s portfolio site + a **streaming, retrieval-augmented (RAG) chat assistant** that answers questions using only the portfolio knowledge base.
 
