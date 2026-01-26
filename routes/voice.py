@@ -7,7 +7,6 @@ NOTE: This is a placeholder for future voice integration.
 from fastapi import APIRouter, Request, WebSocket, HTTPException
 
 from config import logger, VOICE_ENABLED
-from flows.voice import VoiceFlow
 
 router = APIRouter(tags=["voice"])
 

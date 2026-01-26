@@ -150,7 +150,7 @@
     background-image: 
       linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%),
       linear-gradient(to bottom, rgba(241, 234, 209, 0.5) 0%, rgba(241, 234, 209, 0.83) 100%),
-      url("/objects/marble-floor.png");
+      url("/objects/marble-floor.webp");
     background-size: cover;
     background-position: center;
     
