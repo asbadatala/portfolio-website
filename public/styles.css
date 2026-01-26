@@ -10,7 +10,7 @@
     display: grid;
     place-items: center;
   
-    background-image: url("/objects/marble-floor.png");
+    background-image: url("/objects/marble-floor.webp");
     background-repeat: no-repeat;
     background-position: center center;
     background-size: cover;
@@ -101,7 +101,7 @@
     padding: 12px 18px;
     border-radius: 14px;
     border: 1px solid rgba(0,0,0,0.12);
-    background-image: url("/objects/marble-floor.png");
+    background-image: url("/objects/marble-floor.webp");
     background-size: 600px auto;   /* tweak until it looks right */
     background-position: center;
     background-repeat: no-repeat;
