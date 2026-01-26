@@ -47,3 +47,8 @@ async def get_config():
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+# Debug endpoint to check routing
+@app.get("/api/debug")
+async def debug():
+    return {"routes": [r.path for r in app.routes]}
