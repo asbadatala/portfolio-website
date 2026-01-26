@@ -31,7 +31,7 @@ async def stream_unified_agent(message: str, context: str = "", chat_history: st
                     {"role": "system", "content": system_content},
                     {"role": "user", "content": message}
                 ],
-                "max_completion_tokens": 250,
+                "max_completion_tokens": 500,
                 "stream": True
             },
             timeout=60.0

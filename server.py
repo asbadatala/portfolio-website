@@ -64,7 +64,7 @@ if __name__ == "__main__":
         uvicorn.run(
             "server:app",  # Import string format required for reload
             host="0.0.0.0",
-            port=3000,
+            port=3001,
             reload=True,
             reload_includes=["*.py", "*.j2"],
             reload_dirs=[".", "services", "flows", "routes", "prompts"],
@@ -74,5 +74,5 @@ if __name__ == "__main__":
         uvicorn.run(
             app,
             host="0.0.0.0",
-            port=3000,
+            port=3001,
         )
