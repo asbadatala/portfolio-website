@@ -414,12 +414,6 @@
           // Set the input value and submit
           chatInput.value = question;
           chatForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-          
-          // Hide the example questions after clicking
-          const exampleQuestionsDiv = document.querySelector('.example-questions');
-          if (exampleQuestionsDiv) {
-            exampleQuestionsDiv.style.display = 'none';
-          }
         }
       });
     });
