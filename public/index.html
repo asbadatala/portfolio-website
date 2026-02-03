@@ -42,7 +42,7 @@
       </svg>
       <span class="fab-tooltip">Open Chat</span>
     </button>
-    <button class="fab call-fab" id="call-fab" aria-label="Start Call" style="display: none;">
+    <button class="fab call-fab" id="call-fab" aria-label="Start Call">
       <svg class="call-icon" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
         <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
       </svg>
@@ -418,8 +418,450 @@
       });
     });
 
+    // =====================================================
+    // VOICE CALL FUNCTIONALITY
+    // =====================================================
+    
+    // Voice WebSocket and audio state
+    let voiceWebSocket = null;
+    let audioContext = null;
+    let micStream = null;
+    let micProcessor = null;
+    let isPlayingAudio = false;
+    let audioInterrupted = false;  // Flag to ignore audio after interrupt
+    let voiceState = 'idle'; // idle, listening, processing, speaking
+    
+    // Get WebSocket URL based on current page URL
+    function getVoiceWebSocketUrl() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${window.location.host}/api/voice/stream`;
+    }
+    
+    // Initialize AudioContext for playback (at playback sample rate)
+    let playbackContext = null;
+    function initPlaybackContext() {
+      if (!playbackContext) {
+        playbackContext = new (window.AudioContext || window.webkitAudioContext)({
+          sampleRate: 16000
+        });
+      }
+      if (playbackContext.state === 'suspended') {
+        playbackContext.resume();
+      }
+      return playbackContext;
+    }
+    
+    // Convert Linear16 PCM bytes to AudioBuffer
+    function pcmToAudioBuffer(pcmData) {
+      const ctx = initPlaybackContext();
+      
+      // Linear16 PCM is 16-bit signed integers
+      const int16Array = new Int16Array(pcmData.buffer, pcmData.byteOffset, pcmData.byteLength / 2);
+      const float32Array = new Float32Array(int16Array.length);
+      
+      // Convert to float32 (-1.0 to 1.0)
+      for (let i = 0; i < int16Array.length; i++) {
+        float32Array[i] = int16Array[i] / 32768.0;
+      }
+      
+      // Create AudioBuffer
+      const audioBuffer = ctx.createBuffer(1, float32Array.length, 16000);
+      audioBuffer.getChannelData(0).set(float32Array);
+      
+      return audioBuffer;
+    }
+    
+    // Seamless audio playback using scheduled timing
+    let nextPlayTime = 0;
+    let activeSources = [];  // Track ALL active audio sources
+    
+    function queueAudio(audioBuffer) {
+      const ctx = initPlaybackContext();
+      
+      // If this is the first chunk or we're behind, start from now
+      const currentTime = ctx.currentTime;
+      if (nextPlayTime < currentTime) {
+        nextPlayTime = currentTime;
+      }
+      
+      // Create and schedule the source
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      
+      // Schedule to play at the precise time
+      source.start(nextPlayTime);
+      
+      // Track this source for stopping during interruption
+      activeSources.push(source);
+      isPlayingAudio = true;
+      
+      // Update next play time to be right after this buffer ends
+      nextPlayTime += audioBuffer.duration;
+      
+      // Clean up when this source ends
+      source.onended = () => {
+        // Remove from active sources
+        const idx = activeSources.indexOf(source);
+        if (idx > -1) {
+          activeSources.splice(idx, 1);
+        }
+        // Mark as not playing if no more sources
+        if (activeSources.length === 0) {
+          isPlayingAudio = false;
+        }
+      };
+    }
+    
+    // Stop audio playback (for interruption)
+    function stopAudioPlayback() {
+      console.log(`Stopping audio playback (${activeSources.length} active sources)`);
+      const ctx = initPlaybackContext();
+      
+      // Stop ALL active sources
+      for (const source of activeSources) {
+        try {
+          source.stop();
+        } catch (e) {
+          // Source might already be stopped
+        }
+      }
+      activeSources = [];
+      
+      // Reset timing
+      nextPlayTime = ctx.currentTime;
+      isPlayingAudio = false;
+    }
+    
+    // Convert Float32 samples to Int16 (Linear16 PCM)
+    function float32ToInt16(float32Array) {
+      const int16Array = new Int16Array(float32Array.length);
+      for (let i = 0; i < float32Array.length; i++) {
+        // Clamp to -1.0 to 1.0 range and convert to 16-bit
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      return int16Array;
+    }
+    
+    // Downsample audio from source rate to target rate
+    function downsample(samples, sourceSampleRate, targetSampleRate) {
+      if (sourceSampleRate === targetSampleRate) {
+        return samples;
+      }
+      const ratio = sourceSampleRate / targetSampleRate;
+      const newLength = Math.round(samples.length / ratio);
+      const result = new Float32Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        const srcIndex = Math.round(i * ratio);
+        result[i] = samples[srcIndex];
+      }
+      return result;
+    }
+    
+    // Start microphone recording with raw PCM output
+    async function startRecording() {
+      // Check if already recording
+      if (micStream) {
+        console.log('Already recording');
+        return;
+      }
+      
+      // Check if we're in a secure context (HTTPS or localhost)
+      // Note: Chrome treats "localhost" as secure but NOT "127.0.0.1"
+      if (!window.isSecureContext) {
+        const currentHost = window.location.hostname;
+        if (currentHost === '127.0.0.1') {
+          throw new Error('Microphone requires a secure context. Please access this site via http://localhost:3001 instead of http://127.0.0.1:3001');
+        }
+        throw new Error('Microphone access requires HTTPS. Please access this site via HTTPS or http://localhost:3001');
+      }
+      
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Microphone API not available. Please use a modern browser (Chrome, Firefox, Edge, Safari).');
+      }
+      
+      // Pre-check permission state if available (for better error messages)
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const result = await navigator.permissions.query({ name: 'microphone' });
+          console.log('Microphone permission state:', result.state);
+          if (result.state === 'denied') {
+            throw new Error('Microphone access was blocked. Please click the lock/site-settings icon in your browser\'s address bar, allow microphone access, then refresh the page.');
+          }
+        } catch (e) {
+          // Some browsers don't support querying microphone permission - that's ok
+          console.log('Could not query permission state (this is normal):', e.message);
+        }
+      }
+      
+      try {
+        console.log('Requesting microphone access...');
+        micStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            channelCount: 1,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          } 
+        });
+        console.log('Microphone access granted');
+        
+        // Create audio context for capture
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(micStream);
+        
+        // Use ScriptProcessorNode to get raw PCM (deprecated but widely supported)
+        // Buffer size of 4096 gives ~85ms at 48kHz which we downsample to 16kHz
+        const bufferSize = 4096;
+        micProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
+        
+        micProcessor.onaudioprocess = (event) => {
+          if (voiceWebSocket && voiceWebSocket.readyState === WebSocket.OPEN) {
+            const inputData = event.inputBuffer.getChannelData(0);
+            
+            // Downsample to 16kHz if needed
+            const downsampled = downsample(inputData, audioContext.sampleRate, 16000);
+            
+            // Convert to Linear16 PCM
+            const pcmData = float32ToInt16(downsampled);
+            
+            // Send as binary
+            voiceWebSocket.send(pcmData.buffer);
+          }
+        };
+        
+        // Connect: source -> processor -> destination (required for processor to work)
+        source.connect(micProcessor);
+        micProcessor.connect(audioContext.destination);
+        
+        console.log('Recording started (raw PCM at 16kHz)');
+        
+      } catch (error) {
+        console.error('Error starting recording:', error);
+        
+        // Provide specific error messages
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          throw new Error('Microphone permission denied. Please allow microphone access in your browser settings and try again.');
+        } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+          throw new Error('No microphone found. Please connect a microphone and try again.');
+        } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+          throw new Error('Microphone is already in use by another application. Please close other apps using the microphone.');
+        } else if (error.name === 'OverconstrainedError') {
+          throw new Error('Microphone does not support the required settings. Please try a different microphone.');
+        } else {
+          throw new Error(`Microphone error: ${error.message || error.name}`);
+        }
+      }
+    }
+    
+    // Stop microphone recording
+    function stopRecording() {
+      if (micProcessor) {
+        micProcessor.disconnect();
+        micProcessor = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+      }
+      console.log('Recording stopped');
+    }
+    
+    // Connect to voice WebSocket
+    function connectVoiceWebSocket() {
+      return new Promise((resolve, reject) => {
+        const url = getVoiceWebSocketUrl();
+        console.log('Connecting to voice WebSocket:', url);
+        
+        let resolved = false;
+        let timeoutId = null;
+        
+        voiceWebSocket = new WebSocket(url);
+        
+        voiceWebSocket.onopen = () => {
+          console.log('Voice WebSocket connected');
+          // Send start message with session ID
+          voiceWebSocket.send(JSON.stringify({
+            type: 'start',
+            session_id: sessionId
+          }));
+        };
+        
+        voiceWebSocket.onmessage = async (event) => {
+          if (event.data instanceof Blob) {
+            // Binary audio data from TTS
+            // Ignore audio if we've been interrupted
+            if (audioInterrupted) {
+              return;
+            }
+            const arrayBuffer = await event.data.arrayBuffer();
+            const audioBuffer = pcmToAudioBuffer(new Uint8Array(arrayBuffer));
+            queueAudio(audioBuffer);
+          } else {
+            // JSON control message
+            try {
+              const data = JSON.parse(event.data);
+              handleVoiceMessage(data);
+              
+              if (data.type === 'ready' && !resolved) {
+                resolved = true;
+                if (timeoutId) clearTimeout(timeoutId);
+                resolve();
+              } else if (data.type === 'error') {
+                if (!resolved) {
+                  resolved = true;
+                  if (timeoutId) clearTimeout(timeoutId);
+                  reject(new Error(data.message || 'Server error'));
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing voice message:', e);
+            }
+          }
+        };
+        
+        voiceWebSocket.onerror = (error) => {
+          console.error('Voice WebSocket error:', error);
+          if (!resolved) {
+            resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            reject(new Error('WebSocket connection failed. Is the server running?'));
+          }
+        };
+        
+        voiceWebSocket.onclose = (event) => {
+          console.log('Voice WebSocket closed', event.code, event.reason);
+          voiceWebSocket = null;
+          if (!resolved) {
+            resolved = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            reject(new Error('WebSocket connection closed. Please check if the server is running.'));
+          }
+        };
+        
+        // Timeout after 10 seconds
+        timeoutId = setTimeout(() => {
+          if (!resolved && voiceWebSocket && voiceWebSocket.readyState !== WebSocket.OPEN) {
+            resolved = true;
+            voiceWebSocket.close();
+            reject(new Error('Connection timeout - server did not respond'));
+          }
+        }, 10000);
+      });
+    }
+    
+    // Handle voice WebSocket messages
+    function handleVoiceMessage(data) {
+      switch (data.type) {
+        case 'ready':
+          console.log('Voice session ready');
+          break;
+          
+        case 'state':
+          const prevState = voiceState;
+          voiceState = data.state;
+          console.log('Voice state:', prevState, '→', voiceState);
+          updateVoiceUI();
+          
+          // When processing starts, clear any leftover audio from previous response
+          if (voiceState === 'processing') {
+            stopAudioPlayback();
+            audioInterrupted = false;
+          }
+          break;
+        
+        case 'interrupt':
+          // Explicit interrupt signal - stop audio immediately
+          console.log('Interrupt signal received - stopping audio');
+          audioInterrupted = true;  // Ignore any audio still in flight
+          stopAudioPlayback();
+          break;
+          
+        case 'transcript':
+          console.log(`Transcript (${data.is_final ? 'final' : 'interim'}):`, data.text);
+          // Could show transcript in UI if desired
+          break;
+          
+        case 'response':
+          console.log('Response text:', data.text);
+          // Could show response text in UI if desired
+          break;
+          
+        case 'error':
+          console.error('Voice error:', data.message);
+          break;
+      }
+    }
+    
+    // Update UI based on voice state
+    function updateVoiceUI() {
+      // Could add visual indicators for listening/processing/speaking states
+      // For now, just log
+    }
+    
+    // Disconnect voice WebSocket
+    function disconnectVoiceWebSocket() {
+      if (voiceWebSocket) {
+        voiceWebSocket.send(JSON.stringify({ type: 'stop' }));
+        voiceWebSocket.close();
+        voiceWebSocket = null;
+      }
+    }
+    
+    // Start voice call
+    async function startVoiceCall() {
+      try {
+        // Initialize playback context (needs user gesture)
+        initPlaybackContext();
+        
+        // FIRST: Request microphone permission before connecting WebSocket
+        // This ensures we fail fast if permission is denied
+        console.log('Requesting microphone permission...');
+        await startRecording();
+        console.log('Microphone access granted');
+        
+        // THEN: Connect to voice WebSocket
+        console.log('Connecting to voice server...');
+        await connectVoiceWebSocket();
+        
+        console.log('Voice call started');
+        return true;
+      } catch (error) {
+        console.error('Failed to start voice call:', error);
+        
+        // Cleanup on failure
+        stopRecording();
+        disconnectVoiceWebSocket();
+        
+        // Determine specific error type for user-friendly message
+        let errorMessage = error.message || 'Unknown error';
+        
+        // If it's already a user-friendly message, use it as-is
+        if (!errorMessage.includes('Failed to start')) {
+          errorMessage = 'Failed to start voice call: ' + errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+      }
+    }
+    
+    // End voice call
+    function endVoiceCall() {
+      stopRecording();
+      stopAudioPlayback();
+      disconnectVoiceWebSocket();
+      voiceState = 'idle';
+      console.log('Voice call ended');
+    }
+
     // Floating call button
-    callFab.addEventListener('click', () => {
+    callFab.addEventListener('click', async () => {
       const callIcon = callFab.querySelector('.call-icon');
       const endCallIcon = callFab.querySelector('.end-call-icon');
       const tooltip = callFab.querySelector('.fab-tooltip');
@@ -438,16 +880,35 @@
         tooltip.textContent = 'End Call';
         callFab.classList.add('call-active');
         
-        // Trigger call answer
+        // Trigger call answer video
         callEndVideo.classList.remove('active');
         callEndVideo.pause();
         callAnswerVideo.currentTime = 0;
         callAnswerVideo.classList.add('active');
         callAnswerVideo.play();
         
+        // Start voice call
+        try {
+          await startVoiceCall();
+        } catch (error) {
+          // Revert UI on failure
+          isInCall = false;
+          downloadFab.classList.remove('fab-hidden');
+          chatFab.classList.remove('fab-hidden');
+          callIcon.style.display = 'block';
+          endCallIcon.style.display = 'none';
+          tooltip.textContent = 'Start Call';
+          callFab.classList.remove('call-active');
+          hideAllOverlays();
+          alert(error.message || 'Failed to start voice call. Please check microphone permissions.');
+        }
+        
       } else {
         // End call - trigger call end flow
         isInCall = false;
+        
+        // End voice call
+        endVoiceCall();
         
         // Show other FABs
         downloadFab.classList.remove('fab-hidden');
@@ -459,7 +920,7 @@
         tooltip.textContent = 'Start Call';
         callFab.classList.remove('call-active');
         
-        // Trigger call end
+        // Trigger call end video
         callEndVideo.currentTime = 0;
         callEndVideo.classList.add('active');
         callEndVideo.play().then(() => {

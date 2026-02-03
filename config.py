@@ -27,6 +27,9 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 # Environment Variables
 # --------------------------
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+_raw_deepgram_key = os.getenv("DEEPGRAM_API_KEY", "")
+# Strip quotes that might be accidentally included in .env file
+DEEPGRAM_API_KEY = _raw_deepgram_key.strip().strip('"').strip("'")
 UPSTASH_NAMESPACE = os.getenv("UPSTASH_NAMESPACE", "portfolio_rag")
 UPSTASH_REDIS_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")

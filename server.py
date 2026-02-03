@@ -50,6 +50,7 @@ if __name__ == "__main__":
     import sys
     
     logger.info("Starting Portfolio Chatbot Server...")
+    logger.info("Access at: http://localhost:3001 (use localhost for microphone access)")
     
     # Use import string format for reload to work properly
     if "--reload" in sys.argv or len(sys.argv) == 1:
