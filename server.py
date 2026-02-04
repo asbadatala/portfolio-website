@@ -11,7 +11,6 @@ from config import logger
 from routes.chat import router as chat_router
 from routes.token import router as token_router
 from routes.voice_chat import router as voice_chat_router
-from routes.voice import router as voice_router  # Keep for backward compatibility
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -26,7 +25,6 @@ app = FastAPI(
 app.include_router(chat_router, prefix="/api")
 app.include_router(token_router, prefix="/api")
 app.include_router(voice_chat_router, prefix="/api")
-app.include_router(voice_router, prefix="/api")  # Old WebSocket route (kept for compatibility)
 
 # --------------------------
 # Health Check
@@ -65,7 +63,7 @@ if __name__ == "__main__":
             port=3001,
             reload=True,
             reload_includes=["*.py", "*.j2"],
-            reload_dirs=[".", "services", "flows", "routes", "prompts"],
+            reload_dirs=[".", "services", "routes", "prompts"],
         )
     else:
         # Run without reload (production mode)

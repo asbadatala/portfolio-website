@@ -2,6 +2,7 @@
 Routes module - contains API endpoint definitions.
 """
 from .chat import router as chat_router
-from .voice import router as voice_router
+from .token import router as token_router
+from .voice_chat import router as voice_chat_router
 
-__all__ = ["chat_router", "voice_router"]
+__all__ = ["chat_router", "token_router", "voice_chat_router"]
