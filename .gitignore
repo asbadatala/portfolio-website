@@ -59,4 +59,3 @@ dmypy.json
 *.cache
 
 data_ingestion/
-prompts/
