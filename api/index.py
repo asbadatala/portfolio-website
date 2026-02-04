@@ -8,7 +8,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.chat import router as chat_router
-from routes.voice import router as voice_router
+from routes.token import router as token_router
+from routes.voice_chat import router as voice_chat_router
 
 app = FastAPI(
     title="Ankit's Portfolio Chatbot",
@@ -24,8 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# HTTP routes for Vercel serverless
 app.include_router(chat_router, prefix="/api")
-app.include_router(voice_router, prefix="/api")
+app.include_router(token_router, prefix="/api")
+app.include_router(voice_chat_router, prefix="/api")
 
 @app.get("/api/health")
 async def health():

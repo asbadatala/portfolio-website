@@ -50,7 +50,17 @@
         <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <span class="fab-tooltip">Start Call</span>
+      <span class="rate-limit-badge" id="rate-limit-badge" style="display: none;">!</span>
     </button>
+  </div>
+  
+  <!-- Rate limit warning toast -->
+  <div class="rate-limit-toast" id="rate-limit-toast">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 8v4M12 16h.01"/>
+    </svg>
+    <span>Voice busy - please wait a moment</span>
   </div>
 
   <!-- Chat Window - degree-guru style -->
@@ -419,22 +429,513 @@
     });
 
     // =====================================================
-    // VOICE CALL FUNCTIONALITY
+    // VOICE CALL FUNCTIONALITY (Client-Side Deepgram)
     // =====================================================
     
-    // Voice WebSocket and audio state
-    let voiceWebSocket = null;
+    // Voice state
+    let deepgramToken = null;
+    let sttSocket = null;  // Deepgram Flux STT WebSocket
+    let ttsSocket = null;  // Deepgram Aura TTS WebSocket
     let audioContext = null;
     let micStream = null;
     let micProcessor = null;
     let isPlayingAudio = false;
-    let audioInterrupted = false;  // Flag to ignore audio after interrupt
+    let audioInterrupted = false;
     let voiceState = 'idle'; // idle, listening, processing, speaking
+    let isProcessingResponse = false;  // Prevent duplicate processing
     
-    // Get WebSocket URL based on current page URL
-    function getVoiceWebSocketUrl() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}/api/voice/stream`;
+    // Connection tracking for debugging and rate limit prevention
+    let connectionStats = {
+      sttConnections: 0,
+      ttsConnections: 0,
+      sttConnectionsCreated: 0,
+      ttsConnectionsCreated: 0,
+      lastSTTConnect: null,
+      lastTTSConnect: null
+    };
+    
+    // Get Deepgram token from server (keeps API key server-side)
+    async function getDeepgramToken() {
+      const response = await fetch('/api/deepgram-token');
+      if (!response.ok) {
+        throw new Error('Failed to get Deepgram token');
+      }
+      const data = await response.json();
+      return data.key;
+    }
+    
+    // Connect to Deepgram Flux STT
+    async function connectSTT(token) {
+      // Safeguard: Close existing connection if any
+      if (sttSocket) {
+        const state = sttSocket.readyState;
+        console.warn(`STT connection already exists (state: ${state}), closing before creating new one`);
+        try {
+          sttSocket.close();
+        } catch (e) {}
+        sttSocket = null;
+      }
+      
+      return new Promise((resolve, reject) => {
+        const params = new URLSearchParams({
+          model: 'flux-general-en',
+          encoding: 'linear16',
+          sample_rate: '16000',
+          eot_threshold: '0.7',
+          eager_eot_threshold: '0.4',
+          eot_timeout_ms: '6000'
+        });
+        
+        const url = `wss://api.deepgram.com/v2/listen?${params}`;
+        console.log('Connecting to Deepgram STT...');
+        connectionStats.sttConnectionsCreated++;
+        connectionStats.lastSTTConnect = Date.now();
+        
+        sttSocket = new WebSocket(url, ['token', token]);
+        connectionStats.sttConnections++;
+        
+        sttSocket.onopen = () => {
+          console.log(`Deepgram STT connected (total STT connections created: ${connectionStats.sttConnectionsCreated})`);
+          voiceState = 'listening';
+          resolve();
+        };
+        
+        sttSocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            // Log all message types for debugging
+            console.log(`STT message: ${data.type}`);
+            handleSTTMessage(data);
+          } catch (e) {
+            console.error('Error parsing STT message:', e);
+          }
+        };
+        
+        sttSocket.onerror = (error) => {
+          console.error('STT WebSocket error:', error);
+          connectionStats.sttConnections = Math.max(0, connectionStats.sttConnections - 1);
+          reject(new Error('Failed to connect to speech recognition'));
+        };
+        
+        sttSocket.onclose = (event) => {
+          console.log(`STT WebSocket closed (code: ${event.code}, total STT connections created: ${connectionStats.sttConnectionsCreated})`);
+          connectionStats.sttConnections = Math.max(0, connectionStats.sttConnections - 1);
+          sttSocket = null;
+        };
+        
+        // Timeout
+        setTimeout(() => {
+          if (sttSocket && sttSocket.readyState !== WebSocket.OPEN) {
+            sttSocket.close();
+            connectionStats.sttConnections = Math.max(0, connectionStats.sttConnections - 1);
+            reject(new Error('STT connection timeout'));
+          }
+        }, 10000);
+      });
+    }
+    
+    // Handle Deepgram STT messages
+    function handleSTTMessage(data) {
+      const msgType = data.type;
+      
+      // Log all STT events for debugging
+      if (msgType === 'TurnInfo') {
+        console.log(`STT TurnInfo: ${data.event} - "${(data.transcript || '').substring(0, 50)}..."`);
+      }
+      
+      if (msgType === 'TurnInfo') {
+        const event = data.event;
+        const transcript = data.transcript || '';
+        
+        if (event === 'EndOfTurn' && transcript.trim()) {
+          console.log('End of turn:', transcript);
+          console.log(`State check: isProcessingResponse=${isProcessingResponse}, voiceState=${voiceState}`);
+          
+          // Prevent duplicate processing
+          if (isProcessingResponse) {
+            console.log('Already processing, ignoring duplicate EndOfTurn');
+            return;
+          }
+          
+          voiceState = 'processing';
+          stopAudioPlayback();
+          audioInterrupted = false;
+          processAndSpeak(transcript);
+        }
+        else if (event === 'StartOfTurn' || event === 'SpeechStarted') {
+          // User started speaking - interrupt if AI is speaking
+          if (voiceState === 'speaking') {
+            console.log('Interruption detected');
+            audioInterrupted = true;
+            stopAudioPlayback();
+            closeTTS();
+            voiceState = 'listening';
+          }
+        }
+      }
+    }
+    
+    // TTS flush tracking (like backend _pending_flushes and _flush_event)
+    let ttsPendingFlushes = 0;
+    let ttsFlushResolvers = [];
+    
+    // Track TTS connection timing to avoid rate limits
+    let lastTTSConnectTime = 0;
+    const TTS_MIN_CONNECT_INTERVAL = 2000; // Minimum 2 seconds between new connections
+    let voiceRateLimited = false; // Track if we're currently rate limited
+    
+    // Concurrency management (Deepgram guidance: only open new when you have "slots")
+    const MAX_CONCURRENT_TTS = 1; // Only allow 1 TTS connection at a time
+    
+    function hasTTSSlotAvailable() {
+      // Check if we have a slot: no active connection OR existing connection is OPEN and reusable
+      const activeConnections = connectionStats.ttsConnections;
+      const hasOpenSocket = ttsSocket && ttsSocket.readyState === WebSocket.OPEN;
+      
+      // Slot is available if: no active connections, OR we have an open socket we can reuse
+      return activeConnections < MAX_CONCURRENT_TTS || hasOpenSocket;
+    }
+    
+    async function waitForTTSSlot(timeout = 10000) {
+      const startTime = Date.now();
+      while (!hasTTSSlotAvailable()) {
+        if (Date.now() - startTime > timeout) {
+          throw new Error('Timeout waiting for TTS slot');
+        }
+        console.log(`Waiting for TTS slot (active: ${connectionStats.ttsConnections}/${MAX_CONCURRENT_TTS})...`);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    
+    // Rate limit warning UI
+    const rateLimitBadge = document.getElementById('rate-limit-badge');
+    const rateLimitToast = document.getElementById('rate-limit-toast');
+    
+    function showRateLimitWarning() {
+      console.log('Showing rate limit warning');
+      if (rateLimitBadge) rateLimitBadge.style.display = 'flex';
+      if (rateLimitToast) rateLimitToast.classList.add('visible');
+      
+      // Auto-hide toast after 5 seconds (badge stays until resolved)
+      setTimeout(() => {
+        if (rateLimitToast) rateLimitToast.classList.remove('visible');
+      }, 5000);
+    }
+    
+    function hideRateLimitWarning() {
+      console.log('Hiding rate limit warning');
+      if (rateLimitBadge) rateLimitBadge.style.display = 'none';
+      if (rateLimitToast) rateLimitToast.classList.remove('visible');
+    }
+    
+    // Single TTS connection attempt (internal)
+    function tryConnectTTS(token) {
+      // Safeguard: Close existing connection PROPERLY before creating new one
+      if (ttsSocket) {
+        const state = ttsSocket.readyState;
+        console.warn(`TTS connection already exists (state: ${state}), closing before creating new one`);
+        try {
+          // Use proper close code so Deepgram registers the disconnect
+          ttsSocket.close(1000, 'Creating new connection');
+        } catch (e) {}
+        ttsSocket = null;
+        connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+      }
+      
+      return new Promise((resolve, reject) => {
+        const params = new URLSearchParams({
+          model: 'aura-2-odysseus-en',
+          encoding: 'linear16',
+          sample_rate: '16000'
+        });
+        
+        const url = `wss://api.deepgram.com/v1/speak?${params}`;
+        console.log('Connecting to Deepgram TTS...');
+        lastTTSConnectTime = Date.now();
+        connectionStats.ttsConnectionsCreated++;
+        connectionStats.lastTTSConnect = Date.now();
+        
+        ttsSocket = new WebSocket(url, ['token', token]);
+        connectionStats.ttsConnections++;
+        ttsPendingFlushes = 0;
+        ttsFlushResolvers = [];
+        
+        let settled = false;
+        
+        ttsSocket.onopen = () => {
+          if (!settled) {
+            settled = true;
+            console.log(`Deepgram TTS connected (total TTS connections created: ${connectionStats.ttsConnectionsCreated})`);
+            resolve();
+          }
+        };
+        
+        ttsSocket.onmessage = async (event) => {
+          if (event.data instanceof Blob) {
+            // Audio data
+            if (audioInterrupted) return;
+            
+            const arrayBuffer = await event.data.arrayBuffer();
+            const audioBuffer = pcmToAudioBuffer(new Uint8Array(arrayBuffer));
+            queueAudio(audioBuffer);
+          } else {
+            // Control message
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'Flushed') {
+                ttsPendingFlushes = Math.max(0, ttsPendingFlushes - 1);
+                console.log(`TTS Flushed (pending: ${ttsPendingFlushes})`);
+                
+                // Resolve all waiting promises when no more pending flushes
+                if (ttsPendingFlushes === 0 && ttsFlushResolvers.length > 0) {
+                  console.log('All flushes complete - resolving waiters');
+                  ttsFlushResolvers.forEach(r => r());
+                  ttsFlushResolvers = [];
+                }
+              }
+            } catch (e) {}
+          }
+        };
+        
+        ttsSocket.onerror = (error) => {
+          console.error('TTS WebSocket error:', error);
+          connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+          
+          // Explicitly close the connection before nulling (ensures Deepgram registers disconnect)
+          if (ttsSocket) {
+            try {
+              ttsSocket.close(1000, 'Error cleanup');
+            } catch (e) {}
+          }
+          ttsSocket = null;
+          
+          if (!settled) {
+            settled = true;
+            reject(new Error('TTS connection failed'));
+          }
+        };
+        
+        ttsSocket.onclose = () => {
+          console.log(`TTS WebSocket closed (total TTS connections created: ${connectionStats.ttsConnectionsCreated})`);
+          connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+          ttsSocket = null;
+          // Resolve any waiting promises on close
+          ttsFlushResolvers.forEach(r => r());
+          ttsFlushResolvers = [];
+        };
+        
+        setTimeout(() => {
+          if (!settled && ttsSocket && ttsSocket.readyState !== WebSocket.OPEN) {
+            settled = true;
+            connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+            ttsSocket.close();
+            reject(new Error('TTS connection timeout'));
+          }
+        }, 10000);
+      });
+    }
+    
+    // Connect to Deepgram TTS with retry logic (follows Deepgram's 429 guidance)
+    async function connectTTS(token) {
+      // 1. If already connected and open, REUSE it (don't create new)
+      if (ttsSocket && ttsSocket.readyState === WebSocket.OPEN) {
+        console.log(`Reusing existing TTS connection (total TTS connections created: ${connectionStats.ttsConnectionsCreated})`);
+        return;
+      }
+      
+      // 2. Close old streams before opening new ones (Deepgram guidance)
+      if (ttsSocket && ttsSocket.readyState !== WebSocket.OPEN) {
+        console.warn(`Closing stale TTS socket (state: ${ttsSocket.readyState}) before opening new one`);
+        try {
+          ttsSocket.close(1000, 'Cleanup before new connection');
+        } catch (e) {}
+        ttsSocket = null;
+        connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+        // Wait a moment for Deepgram to register the close
+        await new Promise(r => setTimeout(r, 500));
+      }
+      
+      // 3. Wait for slot to be available (never exceed concurrent limit)
+      await waitForTTSSlot(10000);
+      
+      // 4. Retry loop with exponential backoff (Deepgram guidance: 1s, 2s, 4s, 8s)
+      const maxRetries = 4;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        // Enforce minimum interval between connection attempts
+        const now = Date.now();
+        const timeSinceLastConnect = now - lastTTSConnectTime;
+        if (timeSinceLastConnect < TTS_MIN_CONNECT_INTERVAL) {
+          const waitTime = TTS_MIN_CONNECT_INTERVAL - timeSinceLastConnect;
+          console.log(`Throttling: waiting ${waitTime}ms before TTS connect`);
+          await new Promise(r => setTimeout(r, waitTime));
+        }
+        
+        try {
+          await tryConnectTTS(token);
+          // Success - clear rate limit flag
+          if (voiceRateLimited) {
+            voiceRateLimited = false;
+            hideRateLimitWarning();
+          }
+          return;
+        } catch (error) {
+          if (attempt < maxRetries) {
+            // Exponential backoff: 1s, 2s, 4s, 8s (as per Deepgram guidance)
+            const backoff = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s, 8s
+            console.log(`TTS connection failed, retrying in ${backoff}ms (attempt ${attempt + 1}/${maxRetries})`);
+            
+            // Show rate limit warning on first failure
+            if (!voiceRateLimited) {
+              voiceRateLimited = true;
+              showRateLimitWarning();
+            }
+            
+            await new Promise(r => setTimeout(r, backoff));
+          } else {
+            // All retries failed - keep warning visible
+            voiceRateLimited = true;
+            showRateLimitWarning();
+            throw new Error('Voice temporarily unavailable - too many connections. Please wait a moment.');
+          }
+        }
+      }
+    }
+    
+    // Send flush and wait for completion (like backend flush_and_wait)
+    async function flushAndWait(timeout = 30000) {
+      if (!ttsSocket || ttsSocket.readyState !== WebSocket.OPEN) {
+        return;
+      }
+      
+      // Increment pending count BEFORE sending
+      ttsPendingFlushes++;
+      
+      // Send flush command
+      ttsSocket.send(JSON.stringify({ type: 'Flush' }));
+      console.log(`Sent Flush (pending: ${ttsPendingFlushes})`);
+      
+      // If already at 0 pending (shouldn't happen, but safety)
+      if (ttsPendingFlushes === 0) {
+        return;
+      }
+      
+      // Wait for flush completion
+      return new Promise((resolve) => {
+        ttsFlushResolvers.push(resolve);
+        
+        // Timeout fallback
+        setTimeout(() => {
+          const idx = ttsFlushResolvers.indexOf(resolve);
+          if (idx !== -1) {
+            console.log('TTS flush timeout');
+            ttsFlushResolvers.splice(idx, 1);
+            resolve();
+          }
+        }, timeout);
+      });
+    }
+    
+    // Close TTS connection
+    function closeTTS() {
+      // Resolve any pending flush waiters
+      ttsFlushResolvers.forEach(r => r());
+      ttsFlushResolvers = [];
+      ttsPendingFlushes = 0;
+      
+      if (ttsSocket) {
+        console.log('Closing TTS connection');
+        try {
+          ttsSocket.close();
+        } catch (e) {}
+        connectionStats.ttsConnections = Math.max(0, connectionStats.ttsConnections - 1);
+        ttsSocket = null;
+      }
+    }
+    
+    // Process transcript with LLM and speak response
+    async function processAndSpeak(transcript) {
+      isProcessingResponse = true;
+      
+      try {
+        // Connect TTS
+        await connectTTS(deepgramToken);
+        voiceState = 'speaking';
+        
+        // Stream LLM response and send to TTS
+        const response = await fetch('/api/voice/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: transcript,
+            session_id: sessionId
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to get response');
+        }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (audioInterrupted) {
+            console.log('Response interrupted');
+            break;
+          }
+          
+          if (done) break;
+          
+          const text = decoder.decode(value);
+          buffer += text;
+          
+          // Send complete sentences to TTS
+          while (true) {
+            let endIdx = -1;
+            for (const punct of ['. ', '! ', '? ', '.\n', '!\n', '?\n']) {
+              const idx = buffer.indexOf(punct);
+              if (idx !== -1 && (endIdx === -1 || idx < endIdx)) {
+                endIdx = idx + punct.length;
+              }
+            }
+            
+            if (endIdx === -1) break;
+            
+            const sentence = buffer.slice(0, endIdx);
+            buffer = buffer.slice(endIdx);
+            
+            if (sentence.trim() && ttsSocket && ttsSocket.readyState === WebSocket.OPEN) {
+              ttsSocket.send(JSON.stringify({ type: 'Speak', text: sentence }));
+            }
+          }
+        }
+        
+        // Send remaining text
+        if (buffer.trim() && ttsSocket && ttsSocket.readyState === WebSocket.OPEN && !audioInterrupted) {
+          ttsSocket.send(JSON.stringify({ type: 'Speak', text: buffer }));
+        }
+        
+        // Flush TTS and wait for all audio to be generated
+        if (ttsSocket && ttsSocket.readyState === WebSocket.OPEN && !audioInterrupted) {
+          await flushAndWait(15000); // 15 second timeout
+          console.log('Flush complete');
+        }
+        
+      } catch (error) {
+        console.error('Error in processAndSpeak:', error);
+        // Only close TTS on error
+        closeTTS();
+      } finally {
+        // Don't close TTS here - keep it open for reuse to avoid rate limits
+        // TTS will be closed when call ends or on interruption
+        isProcessingResponse = false;
+        if (!audioInterrupted) {
+          voiceState = 'listening';
+        }
+      }
     }
     
     // Initialize AudioContext for playback (at playback sample rate)
@@ -617,8 +1118,10 @@
         const bufferSize = 4096;
         micProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
         
+        let audioFrameCount = 0;
         micProcessor.onaudioprocess = (event) => {
-          if (voiceWebSocket && voiceWebSocket.readyState === WebSocket.OPEN) {
+          // Send to Deepgram STT directly
+          if (sttSocket && sttSocket.readyState === WebSocket.OPEN) {
             const inputData = event.inputBuffer.getChannelData(0);
             
             // Downsample to 16kHz if needed
@@ -628,7 +1131,13 @@
             const pcmData = float32ToInt16(downsampled);
             
             // Send as binary
-            voiceWebSocket.send(pcmData.buffer);
+            sttSocket.send(pcmData.buffer);
+            
+            // Log occasionally to show audio is flowing
+            audioFrameCount++;
+            if (audioFrameCount % 50 === 0) { // Every ~4 seconds
+              console.log(`Audio frames sent: ${audioFrameCount}`);
+            }
           }
         };
         
@@ -673,162 +1182,126 @@
       console.log('Recording stopped');
     }
     
-    // Connect to voice WebSocket
-    function connectVoiceWebSocket() {
-      return new Promise((resolve, reject) => {
-        const url = getVoiceWebSocketUrl();
-        console.log('Connecting to voice WebSocket:', url);
-        
-        let resolved = false;
-        let timeoutId = null;
-        
-        voiceWebSocket = new WebSocket(url);
-        
-        voiceWebSocket.onopen = () => {
-          console.log('Voice WebSocket connected');
-          // Send start message with session ID
-          voiceWebSocket.send(JSON.stringify({
-            type: 'start',
-            session_id: sessionId
-          }));
-        };
-        
-        voiceWebSocket.onmessage = async (event) => {
-          if (event.data instanceof Blob) {
-            // Binary audio data from TTS
-            // Ignore audio if we've been interrupted
-            if (audioInterrupted) {
-              return;
-            }
-            const arrayBuffer = await event.data.arrayBuffer();
-            const audioBuffer = pcmToAudioBuffer(new Uint8Array(arrayBuffer));
-            queueAudio(audioBuffer);
-          } else {
-            // JSON control message
-            try {
-              const data = JSON.parse(event.data);
-              handleVoiceMessage(data);
-              
-              if (data.type === 'ready' && !resolved) {
-                resolved = true;
-                if (timeoutId) clearTimeout(timeoutId);
-                resolve();
-              } else if (data.type === 'error') {
-                if (!resolved) {
-                  resolved = true;
-                  if (timeoutId) clearTimeout(timeoutId);
-                  reject(new Error(data.message || 'Server error'));
-                }
-              }
-            } catch (e) {
-              console.error('Error parsing voice message:', e);
-            }
-          }
-        };
-        
-        voiceWebSocket.onerror = (error) => {
-          console.error('Voice WebSocket error:', error);
-          if (!resolved) {
-            resolved = true;
-            if (timeoutId) clearTimeout(timeoutId);
-            reject(new Error('WebSocket connection failed. Is the server running?'));
-          }
-        };
-        
-        voiceWebSocket.onclose = (event) => {
-          console.log('Voice WebSocket closed', event.code, event.reason);
-          voiceWebSocket = null;
-          if (!resolved) {
-            resolved = true;
-            if (timeoutId) clearTimeout(timeoutId);
-            reject(new Error('WebSocket connection closed. Please check if the server is running.'));
-          }
-        };
-        
-        // Timeout after 10 seconds
-        timeoutId = setTimeout(() => {
-          if (!resolved && voiceWebSocket && voiceWebSocket.readyState !== WebSocket.OPEN) {
-            resolved = true;
-            voiceWebSocket.close();
-            reject(new Error('Connection timeout - server did not respond'));
-          }
-        }, 10000);
+    // Disconnect all voice connections
+    function disconnectVoice() {
+      console.log('Disconnecting all voice connections...');
+      
+      // Close STT
+      if (sttSocket) {
+        try {
+          sttSocket.send(JSON.stringify({ type: 'CloseStream' }));
+          sttSocket.close();
+        } catch (e) {}
+        connectionStats.sttConnections = Math.max(0, connectionStats.sttConnections - 1);
+        sttSocket = null;
+      }
+      
+      // Close TTS
+      closeTTS();
+      
+      deepgramToken = null;
+      isProcessingResponse = false;
+      
+      // Log final stats
+      console.log('Connection stats:', {
+        sttConnections: connectionStats.sttConnections,
+        ttsConnections: connectionStats.ttsConnections,
+        sttConnectionsCreated: connectionStats.sttConnectionsCreated,
+        ttsConnectionsCreated: connectionStats.ttsConnectionsCreated
       });
     }
     
-    // Handle voice WebSocket messages
-    function handleVoiceMessage(data) {
-      switch (data.type) {
-        case 'ready':
-          console.log('Voice session ready');
-          break;
-          
-        case 'state':
-          const prevState = voiceState;
-          voiceState = data.state;
-          console.log('Voice state:', prevState, '→', voiceState);
-          updateVoiceUI();
-          
-          // When processing starts, clear any leftover audio from previous response
-          if (voiceState === 'processing') {
-            stopAudioPlayback();
-            audioInterrupted = false;
-          }
-          break;
-        
-        case 'interrupt':
-          // Explicit interrupt signal - stop audio immediately
-          console.log('Interrupt signal received - stopping audio');
-          audioInterrupted = true;  // Ignore any audio still in flight
-          stopAudioPlayback();
-          break;
-          
-        case 'transcript':
-          console.log(`Transcript (${data.is_final ? 'final' : 'interim'}):`, data.text);
-          // Could show transcript in UI if desired
-          break;
-          
-        case 'response':
-          console.log('Response text:', data.text);
-          // Could show response text in UI if desired
-          break;
-          
-        case 'error':
-          console.error('Voice error:', data.message);
-          break;
-      }
-    }
+    // Debug function to check connection status (call from browser console)
+    window.checkVoiceConnections = function() {
+      const status = {
+        stt: {
+          exists: sttSocket !== null,
+          state: sttSocket ? sttSocket.readyState : null,
+          stateName: sttSocket ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][sttSocket.readyState] : null
+        },
+        tts: {
+          exists: ttsSocket !== null,
+          state: ttsSocket ? ttsSocket.readyState : null,
+          stateName: ttsSocket ? ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ttsSocket.readyState] : null
+        },
+        stats: { ...connectionStats },
+        voiceState: voiceState,
+        isProcessingResponse: isProcessingResponse
+      };
+      console.table(status);
+      return status;
+    };
     
-    // Update UI based on voice state
-    function updateVoiceUI() {
-      // Could add visual indicators for listening/processing/speaking states
-      // For now, just log
-    }
-    
-    // Disconnect voice WebSocket
-    function disconnectVoiceWebSocket() {
-      if (voiceWebSocket) {
-        voiceWebSocket.send(JSON.stringify({ type: 'stop' }));
-        voiceWebSocket.close();
-        voiceWebSocket = null;
-      }
-    }
+    // Test function to verify connection management (call from browser console)
+    // Usage: await testConnectionManagement()
+    window.testConnectionManagement = async function() {
+      console.log('=== Testing Connection Management ===');
+      
+      // Get token
+      const token = await getDeepgramToken();
+      console.log('Token obtained');
+      
+      // Test 1: Create and reuse TTS connection
+      console.log('\nTest 1: Create TTS connection');
+      await connectTTS(token);
+      checkVoiceConnections();
+      
+      console.log('\nTest 2: Reuse existing TTS connection');
+      await connectTTS(token);
+      checkVoiceConnections();
+      
+      // Test 3: Close and recreate
+      console.log('\nTest 3: Close and recreate TTS connection');
+      closeTTS();
+      await new Promise(r => setTimeout(r, 3500)); // Wait for rate limit window
+      await connectTTS(token);
+      checkVoiceConnections();
+      
+      // Cleanup
+      console.log('\nCleaning up...');
+      disconnectVoice();
+      checkVoiceConnections();
+      
+      console.log('\n=== Test Complete ===');
+      console.log('Expected: Only 2-3 TTS connections created (not 5+)');
+    };
     
     // Start voice call
     async function startVoiceCall() {
       try {
+        // Clean up any existing connections first
+        disconnectVoice();
+        
+        // Reset all state first (in case previous call didn't end cleanly)
+        isProcessingResponse = false;
+        audioInterrupted = false;
+        voiceState = 'idle';
+        ttsPendingFlushes = 0;
+        ttsFlushResolvers = [];
+        lastTTSConnectTime = 0; // Reset rate limit timer
+        
+        // Clear any previous rate limit warning (fresh start)
+        voiceRateLimited = false;
+        hideRateLimitWarning();
+        
+        console.log('Starting new voice call - connection stats reset');
+        
         // Initialize playback context (needs user gesture)
         initPlaybackContext();
         
-        // FIRST: Request microphone permission before connecting WebSocket
-        // This ensures we fail fast if permission is denied
+        // Get Deepgram token first
+        console.log('Getting Deepgram token...');
+        deepgramToken = await getDeepgramToken();
+        console.log('Token received');
+        
+        // Request microphone permission
         console.log('Requesting microphone permission...');
         await startRecording();
         console.log('Microphone access granted');
         
-        // THEN: Connect to voice WebSocket
-        console.log('Connecting to voice server...');
-        await connectVoiceWebSocket();
+        // Connect to Deepgram STT
+        console.log('Connecting to speech recognition...');
+        await connectSTT(deepgramToken);
         
         console.log('Voice call started');
         return true;
@@ -837,12 +1310,9 @@
         
         // Cleanup on failure
         stopRecording();
-        disconnectVoiceWebSocket();
+        disconnectVoice();
         
-        // Determine specific error type for user-friendly message
         let errorMessage = error.message || 'Unknown error';
-        
-        // If it's already a user-friendly message, use it as-is
         if (!errorMessage.includes('Failed to start')) {
           errorMessage = 'Failed to start voice call: ' + errorMessage;
         }
@@ -855,8 +1325,9 @@
     function endVoiceCall() {
       stopRecording();
       stopAudioPlayback();
-      disconnectVoiceWebSocket();
+      disconnectVoice();
       voiceState = 'idle';
+      audioInterrupted = false;
       console.log('Voice call ended');
     }
 

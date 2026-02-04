@@ -54,7 +54,7 @@ async def save_session_message(session_id: str, role: str, content: str):
         
         # Save back to Redis with TTL
         redis_client.setex(key, SESSION_TTL_SECONDS, json.dumps(history))
-        logger.debug(f"Saved message to session {session_id}, total messages: {len(history)}")
+        logger.info(f"Redis: Saved message to session {session_id}, total messages: {len(history)}")
     except Exception as e:
         logger.error(f"Error saving session message: {e}")
 
