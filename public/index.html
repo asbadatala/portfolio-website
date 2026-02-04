@@ -12,20 +12,52 @@
 </head>
 <body>
 
-  <div class="frame">
-    <!-- Background typing video - always playing -->
-    <video class="vid vid-bg" autoplay muted loop playsinline preload="auto">
-      <source src="/objects/videos/marble-typing-astra.mp4" type="video/mp4" />
-    </video>
+  <div class="frame-container">
+    <div class="frame">
+      <!-- Background typing video - always playing -->
+      <video class="vid vid-bg" autoplay muted loop playsinline preload="auto">
+        <source src="/objects/videos/marble-typing-astra.mp4" type="video/mp4" />
+      </video>
+      
+      <!-- Overlay videos - shown on top when needed -->
+      <video class="vid vid-overlay" id="call-answer-vid" muted playsinline>
+        <source src="/objects/videos/call-answer.mp4" type="video/mp4" />
+      </video>
+      
+      <video class="vid vid-overlay" id="call-end-vid" muted playsinline>
+        <source src="/objects/videos/call-end.mp4" type="video/mp4" />
+      </video>
+    </div>
     
-    <!-- Overlay videos - shown on top when needed -->
-    <video class="vid vid-overlay" id="call-answer-vid" muted playsinline>
-      <source src="/objects/videos/call-answer.mp4" type="video/mp4" />
-    </video>
-    
-    <video class="vid vid-overlay" id="call-end-vid" muted playsinline>
-      <source src="/objects/videos/call-end.mp4" type="video/mp4" />
-    </video>
+    <!-- Voice Waveform Visualizer - below video -->
+    <div class="voice-waveform" id="voice-waveform">
+      <div class="waveform-bars" id="waveform-bars">
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+        <div class="waveform-bar"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Floating Action Buttons -->
@@ -121,6 +153,7 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   
   <script>
+    const frameContainer = document.querySelector('.frame-container');
     const frame = document.querySelector('.frame');
     const bgVideo = document.querySelector('.vid-bg');
     const callAnswerVideo = document.getElementById('call-answer-vid');
@@ -138,6 +171,8 @@
     const chatCloseBtn = document.getElementById('chat-close-btn');
     const downloadFab = document.getElementById('download-fab');
     const callFab = document.getElementById('call-fab');
+    const voiceWaveform = document.getElementById('voice-waveform');
+    const waveformBars = document.querySelectorAll('.waveform-bar');
     
     // Call state
     let isInCall = false;
@@ -191,13 +226,13 @@
 
     // Toggle chat panel
     function openChat() {
-      frame.classList.add('chat-open');
+      frameContainer.classList.add('chat-open');
       chatPanel.classList.add('open');
       chatInput.focus();
     }
 
     function closeChat() {
-      frame.classList.remove('chat-open');
+      frameContainer.classList.remove('chat-open');
       chatPanel.classList.remove('open');
     }
 
@@ -454,6 +489,160 @@
       lastTTSConnect: null
     };
     
+    // Audio analyzer for waveform visualization
+    let micAnalyser = null;
+    let micDataArray = null;
+    let waveformAnimationId = null;
+    
+    // Setup audio analyzer for microphone visualization
+    function setupMicAnalyser(stream) {
+      if (!audioContext) return;
+      
+      try {
+        micAnalyser = audioContext.createAnalyser();
+        micAnalyser.fftSize = 64;
+        micAnalyser.smoothingTimeConstant = 0.8;
+        
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(micAnalyser);
+        
+        micDataArray = new Uint8Array(micAnalyser.frequencyBinCount);
+        console.log('Mic analyser setup complete');
+      } catch (e) {
+        console.error('Failed to setup mic analyser:', e);
+      }
+    }
+    
+    // Update waveform bars based on audio levels
+    function updateWaveform() {
+      if (!micAnalyser || !micDataArray) {
+        // If no analyser, just request next frame to check again
+        waveformAnimationId = requestAnimationFrame(updateWaveform);
+        return;
+      }
+      
+      micAnalyser.getByteFrequencyData(micDataArray);
+      
+      // Map frequency data to bar heights
+      const barCount = waveformBars.length;
+      const step = Math.floor(micDataArray.length / barCount);
+      
+      for (let i = 0; i < barCount; i++) {
+        // Get average of frequency range for this bar
+        let sum = 0;
+        for (let j = 0; j < step; j++) {
+          sum += micDataArray[i * step + j];
+        }
+        const avg = sum / step;
+        
+        // Scale to reasonable height (8px min, 60px max)
+        const height = Math.max(8, Math.min(60, 8 + (avg / 255) * 52));
+        waveformBars[i].style.height = `${height}px`;
+      }
+      
+      waveformAnimationId = requestAnimationFrame(updateWaveform);
+    }
+    
+    // Start/stop waveform animation
+    function startWaveformAnimation() {
+      if (!waveformAnimationId) {
+        waveformAnimationId = requestAnimationFrame(updateWaveform);
+      }
+    }
+    
+    function stopWaveformAnimation() {
+      if (waveformAnimationId) {
+        cancelAnimationFrame(waveformAnimationId);
+        waveformAnimationId = null;
+      }
+      // Reset bars to minimum height
+      waveformBars.forEach(bar => bar.style.height = '8px');
+    }
+    
+    // Update waveform UI state
+    function updateWaveformState(state) {
+      voiceWaveform.classList.remove('idle', 'speaking', 'user-talking', 'processing');
+      
+      switch (state) {
+        case 'listening':
+          voiceWaveform.classList.add('user-talking');
+          startWaveformAnimation();
+          break;
+        case 'processing':
+          voiceWaveform.classList.add('processing');
+          stopWaveformAnimation();
+          break;
+        case 'speaking':
+          voiceWaveform.classList.add('speaking');
+          // Simulate speaking animation
+          simulateSpeakingWaveform();
+          break;
+        default:
+          voiceWaveform.classList.add('idle');
+          stopWaveformAnimation();
+      }
+    }
+    
+    // Real waveform visualization for TTS audio output
+    let speakingAnimationId = null;
+    function simulateSpeakingWaveform() {
+      stopWaveformAnimation(); // Stop mic-based animation
+      
+      function animateSpeaking() {
+        if (!speakerAnalyser || !speakerDataArray) {
+          // Fallback if analyser not ready
+          speakingAnimationId = requestAnimationFrame(animateSpeaking);
+          return;
+        }
+        
+        // Get real frequency data from speaker output
+        speakerAnalyser.getByteFrequencyData(speakerDataArray);
+        
+        // Map frequency data to bar heights
+        const barCount = waveformBars.length;
+        const step = Math.floor(speakerDataArray.length / barCount);
+        
+        for (let i = 0; i < barCount; i++) {
+          // Get average of frequency range for this bar
+          let sum = 0;
+          for (let j = 0; j < step; j++) {
+            sum += speakerDataArray[i * step + j];
+          }
+          const avg = sum / step;
+          
+          // Scale to reasonable height (6px min, 50px max)
+          const height = Math.max(6, Math.min(50, 6 + (avg / 255) * 44));
+          waveformBars[i].style.height = `${height}px`;
+        }
+        
+        speakingAnimationId = requestAnimationFrame(animateSpeaking);
+      }
+      
+      if (speakingAnimationId) {
+        cancelAnimationFrame(speakingAnimationId);
+      }
+      speakingAnimationId = requestAnimationFrame(animateSpeaking);
+    }
+    
+    function stopSpeakingSimulation() {
+      if (speakingAnimationId) {
+        cancelAnimationFrame(speakingAnimationId);
+        speakingAnimationId = null;
+      }
+    }
+    
+    // Show/hide waveform
+    function showWaveform() {
+      voiceWaveform.classList.add('active');
+      updateWaveformState('listening');
+    }
+    
+    function hideWaveform() {
+      voiceWaveform.classList.remove('active');
+      stopWaveformAnimation();
+      stopSpeakingSimulation();
+    }
+    
     // Get Deepgram token from server (keeps API key server-side)
     async function getDeepgramToken() {
       const response = await fetch('/api/deepgram-token');
@@ -497,6 +686,7 @@
         sttSocket.onopen = () => {
           console.log(`Deepgram STT connected (total STT connections created: ${connectionStats.sttConnectionsCreated})`);
           voiceState = 'listening';
+          updateWaveformState('listening');
           resolve();
         };
         
@@ -558,6 +748,7 @@
           }
           
           voiceState = 'processing';
+          updateWaveformState('processing');
           stopAudioPlayback();
           audioInterrupted = false;
           processAndSpeak(transcript);
@@ -570,6 +761,7 @@
             stopAudioPlayback();
             closeTTS();
             voiceState = 'listening';
+            updateWaveformState('listening');
           }
         }
       }
@@ -857,9 +1049,8 @@
       isProcessingResponse = true;
       
       try {
-        // Connect TTS
+        // Connect TTS (speaking state will be set when first audio chunk is queued)
         await connectTTS(deepgramToken);
-        voiceState = 'speaking';
         
         // Stream LLM response and send to TTS
         const response = await fetch('/api/voice/chat', {
@@ -932,19 +1123,31 @@
         // Don't close TTS here - keep it open for reuse to avoid rate limits
         // TTS will be closed when call ends or on interruption
         isProcessingResponse = false;
-        if (!audioInterrupted) {
-          voiceState = 'listening';
-        }
+        // Note: voiceState transitions to 'listening' happens in queueAudio's onended callback
+        // when all audio finishes playing, ensuring accurate waveform timing
       }
     }
     
     // Initialize AudioContext for playback (at playback sample rate)
     let playbackContext = null;
+    let speakerAnalyser = null;  // Analyser for TTS audio visualization
+    let speakerDataArray = null;
+    
     function initPlaybackContext() {
       if (!playbackContext) {
         playbackContext = new (window.AudioContext || window.webkitAudioContext)({
           sampleRate: 16000
         });
+        
+        // Create analyser for speaker output visualization
+        speakerAnalyser = playbackContext.createAnalyser();
+        speakerAnalyser.fftSize = 64;
+        speakerAnalyser.smoothingTimeConstant = 0.7;
+        speakerDataArray = new Uint8Array(speakerAnalyser.frequencyBinCount);
+        
+        // Connect analyser to destination (speakers)
+        speakerAnalyser.connect(playbackContext.destination);
+        console.log('Speaker analyser initialized for real waveform visualization');
       }
       if (playbackContext.state === 'suspended') {
         playbackContext.resume();
@@ -975,6 +1178,7 @@
     // Seamless audio playback using scheduled timing
     let nextPlayTime = 0;
     let activeSources = [];  // Track ALL active audio sources
+    let hasStartedSpeaking = false;  // Track if we've shown speaking state
     
     function queueAudio(audioBuffer) {
       const ctx = initPlaybackContext();
@@ -988,7 +1192,8 @@
       // Create and schedule the source
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(ctx.destination);
+      // Route through analyser for real waveform visualization
+      source.connect(speakerAnalyser);
       
       // Schedule to play at the precise time
       source.start(nextPlayTime);
@@ -996,6 +1201,14 @@
       // Track this source for stopping during interruption
       activeSources.push(source);
       isPlayingAudio = true;
+      
+      // Trigger speaking state on FIRST audio chunk (actual speech start)
+      if (!hasStartedSpeaking && voiceState === 'processing') {
+        hasStartedSpeaking = true;
+        voiceState = 'speaking';
+        updateWaveformState('speaking');
+        console.log('Audio playback started - showing speaking animation');
+      }
       
       // Update next play time to be right after this buffer ends
       nextPlayTime += audioBuffer.duration;
@@ -1010,6 +1223,13 @@
         // Mark as not playing if no more sources
         if (activeSources.length === 0) {
           isPlayingAudio = false;
+          // Audio finished - back to listening (if not interrupted)
+          if (!audioInterrupted && voiceState === 'speaking') {
+            voiceState = 'listening';
+            updateWaveformState('listening');
+            hasStartedSpeaking = false;
+            console.log('Audio playback finished - back to listening');
+          }
         }
       };
     }
@@ -1028,6 +1248,7 @@
         }
       }
       activeSources = [];
+      hasStartedSpeaking = false;  // Reset for next response
       
       // Reset timing
       nextPlayTime = ctx.currentTime;
@@ -1111,6 +1332,10 @@
         
         // Create audio context for capture
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Setup analyser for waveform visualization
+        setupMicAnalyser(micStream);
+        
         const source = audioContext.createMediaStreamSource(micStream);
         
         // Use ScriptProcessorNode to get raw PCM (deprecated but widely supported)
@@ -1167,6 +1392,10 @@
     
     // Stop microphone recording
     function stopRecording() {
+      // Clean up waveform analyzer
+      micAnalyser = null;
+      micDataArray = null;
+      
       if (micProcessor) {
         micProcessor.disconnect();
         micProcessor = null;
@@ -1279,6 +1508,7 @@
         ttsPendingFlushes = 0;
         ttsFlushResolvers = [];
         lastTTSConnectTime = 0; // Reset rate limit timer
+        hasStartedSpeaking = false;  // Reset speaking state tracker
         
         // Clear any previous rate limit warning (fresh start)
         voiceRateLimited = false;
@@ -1303,6 +1533,9 @@
         console.log('Connecting to speech recognition...');
         await connectSTT(deepgramToken);
         
+        // Show waveform visualizer
+        showWaveform();
+        
         console.log('Voice call started');
         return true;
       } catch (error) {
@@ -1326,6 +1559,7 @@
       stopRecording();
       stopAudioPlayback();
       disconnectVoice();
+      hideWaveform();
       voiceState = 'idle';
       audioInterrupted = false;
       console.log('Voice call ended');

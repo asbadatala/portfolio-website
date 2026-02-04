@@ -24,7 +24,6 @@
     aspect-ratio: var(--scene-ar);
     overflow: hidden;          /* crops the black bars */
     transform: translateX(-5%); /* Move the entire frame (video + crop) to the left slightly*/
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); /* Smooth slide animation */
 
     /* Mask applied to the container so all videos inherit the same fade */
     -webkit-mask-image:
@@ -64,9 +63,7 @@
     mask-composite: intersect;
   }
 
-  .frame.chat-open{
-    transform: translateX(-30vw) scale(0.7); /* Slide left and shrink 30% */
-  }
+  /* chat-open state is now handled by .frame-container.chat-open */
   
   .vid{
     width: 100%;
@@ -538,14 +535,17 @@
     pointer-events: none;
   }
 
-  /* Call active state - red X button */
+  /* Call active state - same as start call button */
   .fab.call-active{
-    background: linear-gradient(135deg, #c94c4c, #a33a3a);
+    background: linear-gradient(135deg, #8b7355, #6b5344);
+    color: #f1ead1;
+    border: none;
   }
 
   .fab.call-active:hover{
+    transform: scale(1.08);
     box-shadow: 
-      0 8px 32px rgba(201, 76, 76, 0.5),
+      0 8px 32px rgba(107, 83, 68, 0.5),
       0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
@@ -602,6 +602,161 @@
 
   .rate-limit-toast svg {
     flex-shrink: 0;
+  }
+
+  /* Frame container - wraps video and waveform */
+  .frame-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .frame-container.chat-open {
+    transform: translateX(-30vw) scale(0.7);
+  }
+
+  /* Voice Waveform Visualizer - positioned below video */
+  .voice-waveform {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -40px; /* Overlap slightly with video fade */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s ease, transform 0.4s ease;
+    transform: translateY(-10px);
+    z-index: 10;
+  }
+
+  .voice-waveform.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+  }
+
+  .waveform-bars {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 40px;
+    padding: 8px 40px;
+    background: rgba(139, 115, 85, 0.06);
+    border-radius: 20px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(139, 115, 85, 0.1);
+  }
+
+  .waveform-bar {
+    width: 3px;
+    height: 6px;
+    background: linear-gradient(180deg, #a08060 0%, #8b7355 50%, #6b5545 100%);
+    border-radius: 1.5px;
+    transition: height 0.06s ease-out;
+  }
+
+  /* Idle/waiting state - subtle pulse */
+  .voice-waveform.idle .waveform-bar {
+    animation: idle-pulse 2s ease-in-out infinite;
+  }
+
+  .voice-waveform.idle .waveform-bar:nth-child(1) { animation-delay: 0s; }
+  .voice-waveform.idle .waveform-bar:nth-child(2) { animation-delay: 0.06s; }
+  .voice-waveform.idle .waveform-bar:nth-child(3) { animation-delay: 0.12s; }
+  .voice-waveform.idle .waveform-bar:nth-child(4) { animation-delay: 0.18s; }
+  .voice-waveform.idle .waveform-bar:nth-child(5) { animation-delay: 0.24s; }
+  .voice-waveform.idle .waveform-bar:nth-child(6) { animation-delay: 0.3s; }
+  .voice-waveform.idle .waveform-bar:nth-child(7) { animation-delay: 0.36s; }
+  .voice-waveform.idle .waveform-bar:nth-child(8) { animation-delay: 0.42s; }
+  .voice-waveform.idle .waveform-bar:nth-child(9) { animation-delay: 0.48s; }
+  .voice-waveform.idle .waveform-bar:nth-child(10) { animation-delay: 0.54s; }
+  .voice-waveform.idle .waveform-bar:nth-child(11) { animation-delay: 0.6s; }
+  .voice-waveform.idle .waveform-bar:nth-child(12) { animation-delay: 0.66s; }
+  .voice-waveform.idle .waveform-bar:nth-child(13) { animation-delay: 0.72s; }
+  .voice-waveform.idle .waveform-bar:nth-child(14) { animation-delay: 0.78s; }
+  .voice-waveform.idle .waveform-bar:nth-child(15) { animation-delay: 0.84s; }
+  .voice-waveform.idle .waveform-bar:nth-child(16) { animation-delay: 0.9s; }
+  .voice-waveform.idle .waveform-bar:nth-child(17) { animation-delay: 0.96s; }
+  .voice-waveform.idle .waveform-bar:nth-child(18) { animation-delay: 1.02s; }
+  .voice-waveform.idle .waveform-bar:nth-child(19) { animation-delay: 1.08s; }
+  .voice-waveform.idle .waveform-bar:nth-child(20) { animation-delay: 1.14s; }
+  .voice-waveform.idle .waveform-bar:nth-child(21) { animation-delay: 1.2s; }
+  .voice-waveform.idle .waveform-bar:nth-child(22) { animation-delay: 1.26s; }
+  .voice-waveform.idle .waveform-bar:nth-child(23) { animation-delay: 1.32s; }
+  .voice-waveform.idle .waveform-bar:nth-child(24) { animation-delay: 1.38s; }
+
+  @keyframes idle-pulse {
+    0%, 100% { height: 6px; opacity: 0.3; }
+    50% { height: 10px; opacity: 0.5; }
+  }
+
+  /* Speaking state - bot is talking (lighter/golden) */
+  .voice-waveform.speaking .waveform-bar {
+    background: linear-gradient(180deg, #d4b896 0%, #c4a87c 50%, #a08060 100%);
+  }
+
+  /* User talking state - real-time mic visualization */
+  .voice-waveform.user-talking .waveform-bar {
+    background: linear-gradient(180deg, #a08060 0%, #8b7355 50%, #6b5545 100%);
+  }
+
+  /* Processing/thinking state - gentle breathing animation */
+  .voice-waveform.processing .waveform-bar {
+    animation: processing-breathe 1.2s ease-in-out infinite;
+    background: linear-gradient(180deg, #9a8a7a 0%, #8b7a6a 50%, #7b6a5a 100%);
+  }
+
+  .voice-waveform.processing .waveform-bar:nth-child(1) { animation-delay: 0s; }
+  .voice-waveform.processing .waveform-bar:nth-child(2) { animation-delay: 0.04s; }
+  .voice-waveform.processing .waveform-bar:nth-child(3) { animation-delay: 0.08s; }
+  .voice-waveform.processing .waveform-bar:nth-child(4) { animation-delay: 0.12s; }
+  .voice-waveform.processing .waveform-bar:nth-child(5) { animation-delay: 0.16s; }
+  .voice-waveform.processing .waveform-bar:nth-child(6) { animation-delay: 0.2s; }
+  .voice-waveform.processing .waveform-bar:nth-child(7) { animation-delay: 0.24s; }
+  .voice-waveform.processing .waveform-bar:nth-child(8) { animation-delay: 0.28s; }
+  .voice-waveform.processing .waveform-bar:nth-child(9) { animation-delay: 0.32s; }
+  .voice-waveform.processing .waveform-bar:nth-child(10) { animation-delay: 0.36s; }
+  .voice-waveform.processing .waveform-bar:nth-child(11) { animation-delay: 0.4s; }
+  .voice-waveform.processing .waveform-bar:nth-child(12) { animation-delay: 0.44s; }
+  .voice-waveform.processing .waveform-bar:nth-child(13) { animation-delay: 0.48s; }
+  .voice-waveform.processing .waveform-bar:nth-child(14) { animation-delay: 0.52s; }
+  .voice-waveform.processing .waveform-bar:nth-child(15) { animation-delay: 0.56s; }
+  .voice-waveform.processing .waveform-bar:nth-child(16) { animation-delay: 0.6s; }
+  .voice-waveform.processing .waveform-bar:nth-child(17) { animation-delay: 0.64s; }
+  .voice-waveform.processing .waveform-bar:nth-child(18) { animation-delay: 0.68s; }
+  .voice-waveform.processing .waveform-bar:nth-child(19) { animation-delay: 0.72s; }
+  .voice-waveform.processing .waveform-bar:nth-child(20) { animation-delay: 0.76s; }
+  .voice-waveform.processing .waveform-bar:nth-child(21) { animation-delay: 0.8s; }
+  .voice-waveform.processing .waveform-bar:nth-child(22) { animation-delay: 0.84s; }
+  .voice-waveform.processing .waveform-bar:nth-child(23) { animation-delay: 0.88s; }
+  .voice-waveform.processing .waveform-bar:nth-child(24) { animation-delay: 0.92s; }
+
+  @keyframes processing-breathe {
+    0%, 100% { height: 8px; opacity: 0.4; }
+    50% { height: 14px; opacity: 0.6; }
+  }
+
+  /* Mobile responsive */
+  @media (max-width: 768px) {
+    .voice-waveform {
+      margin-top: -30px;
+    }
+
+    .waveform-bars {
+      height: 32px;
+      padding: 6px 16px;
+      gap: 2px;
+    }
+
+    .waveform-bar {
+      width: 2px;
+    }
+
+    .waveform-label {
+      font-size: 10px;
+    }
   }
 
   /* Chat Close Button */
