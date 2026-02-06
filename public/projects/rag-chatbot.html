@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG Chatbot - Ankit Badatala</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="blog-page">
+
+  <!-- Social Links - Top Right (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
+
+  <!-- Back Button (loaded from component) -->
+  <!-- Home Button (loaded from component) -->
+  <a class="home-button" id="home-button"></a>
+  <script src="/components/back-button.js"></script>
+
+  <!-- Project Post Container (reusing blog post styles) -->
+  <article class="blog-post-container">
+    <header class="blog-post-header">
+      <span class="blog-post-date">January 2026</span>
+      <h1>RAG Chatbot</h1>
+      <p class="blog-post-subtitle">A retrieval-augmented generation chatbot that answers questions about my career and experience.</p>
+    </header>
+
+    <div class="blog-post-content">
+      <h2 id="overview">Overview</h2>
+      <p>
+        The RAG chatbot is the text-based counterpart to the Voice AI. It uses vector search to find relevant context from my resume, experience documents, and project descriptions, then generates accurate, grounded responses.
+      </p>
+
+      <h2 id="tech-stack">Tech Stack</h2>
+      <ul>
+        <li><strong>Vector Database:</strong> Upstash Vector for semantic search</li>
+        <li><strong>Embeddings:</strong> OpenAI text-embedding-3-small</li>
+        <li><strong>LLM:</strong> OpenAI GPT-4 with streaming responses</li>
+        <li><strong>Session Management:</strong> Upstash Redis for conversation history</li>
+        <li><strong>Backend:</strong> FastAPI with Python</li>
+        <li><strong>Hosting:</strong> Vercel serverless functions</li>
+      </ul>
+
+      <h2 id="key-features">Key Features</h2>
+      <ul>
+        <li><strong>Semantic search:</strong> Finds relevant context even with paraphrased questions</li>
+        <li><strong>Streaming responses:</strong> Real-time token-by-token output</li>
+        <li><strong>Grounded answers:</strong> Only responds based on actual information about me</li>
+        <li><strong>Conversation memory:</strong> Maintains context across multiple turns</li>
+        <li><strong>Example questions:</strong> Suggested prompts to help users get started</li>
+      </ul>
+
+      <h2 id="architecture">Architecture</h2>
+      <p>
+        The system follows a standard RAG pattern: embed the user's question, retrieve top-k similar chunks from the vector store, inject them into the prompt as context, and generate a response. The key innovation is the careful prompt engineering to ensure the AI only uses provided context and doesn't hallucinate.
+      </p>
+
+      <h2 id="results">Results</h2>
+      <p>
+        The chatbot successfully answers questions about my technical skills, project experience, and career history with high accuracy. It gracefully handles out-of-scope questions by acknowledging what it doesn't know.
+      </p>
+    </div>
+  </article>
+
+  <!-- Table of Contents Sidebar (loaded from component) -->
+  <aside class="blog-toc" id="blog-toc"></aside>
+  <script src="/components/blog-toc.js"></script>
+
+</body>
+</html>

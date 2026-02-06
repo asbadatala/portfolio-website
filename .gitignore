@@ -24,6 +24,7 @@ ENV/
 *.swo
 *~
 .DS_Store
+.cursor/
 
 # Logs
 *.log
@@ -58,4 +59,8 @@ dmypy.json
 *.bak
 *.cache
 
+# Data ingestion (not needed for deployment)
 data_ingestion/
+
+# Vercel
+.vercel/

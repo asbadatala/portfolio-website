@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice AI Portfolio - Ankit Badatala</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="blog-page">
+
+  <!-- Social Links - Top Right (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
+
+  <!-- Back Button (loaded from component) -->
+  <!-- Home Button (loaded from component) -->
+  <a class="home-button" id="home-button"></a>
+  <script src="/components/back-button.js"></script>
+
+  <!-- Project Post Container (reusing blog post styles) -->
+  <article class="blog-post-container">
+    <header class="blog-post-header">
+      <span class="blog-post-date">February 2026</span>
+      <h1>Voice AI Portfolio</h1>
+      <p class="blog-post-subtitle">A streaming voice assistant that lets visitors talk to my portfolio using Deepgram Flux and Aura.</p>
+    </header>
+
+    <div class="blog-post-content">
+      <h2 id="overview">Overview</h2>
+      <p>
+        This project brings my portfolio to life with a voice AI assistant. Visitors can click the call button and have a natural conversation about my experience, skills, and projects—just like talking to a recruiter or colleague.
+      </p>
+
+      <h2 id="tech-stack">Tech Stack</h2>
+      <ul>
+        <li><strong>Speech-to-Text:</strong> Deepgram Flux for real-time transcription with turn detection</li>
+        <li><strong>Text-to-Speech:</strong> Deepgram Aura for natural streaming audio synthesis</li>
+        <li><strong>LLM:</strong> OpenAI GPT-4 for conversational responses</li>
+        <li><strong>RAG:</strong> Upstash Vector for context retrieval from my resume and experience</li>
+        <li><strong>Session Management:</strong> Redis for conversation history across turns</li>
+        <li><strong>Frontend:</strong> Vanilla JavaScript with Web Audio API</li>
+        <li><strong>Hosting:</strong> Vercel serverless functions</li>
+      </ul>
+
+      <h2 id="key-features">Key Features</h2>
+      <ul>
+        <li><strong>Real-time streaming:</strong> Audio starts playing before the full response is generated</li>
+        <li><strong>Interruption support:</strong> Users can interrupt mid-sentence and the AI stops immediately</li>
+        <li><strong>Visual waveform:</strong> Real-time audio visualization synced to actual speech</li>
+        <li><strong>Session memory:</strong> The AI remembers context within a conversation</li>
+        <li><strong>Graceful degradation:</strong> Falls back to text chat if voice fails</li>
+      </ul>
+
+      <h2 id="challenges">Challenges & Solutions</h2>
+      <p>
+        The biggest challenge was achieving low latency while maintaining natural conversation flow. I solved this by:
+      </p>
+      <ul>
+        <li>Using Deepgram's turn detection instead of silence-based VAD</li>
+        <li>Streaming LLM responses directly to TTS without buffering</li>
+        <li>Implementing proper WebSocket connection management to avoid rate limits</li>
+        <li>Building a custom audio scheduling system for seamless playback</li>
+      </ul>
+
+      <h2 id="results">Results</h2>
+      <p>
+        The final system achieves ~800ms time-to-first-audio, supports natural barge-in, and handles edge cases like background noise gracefully. It's been a great conversation starter with recruiters!
+      </p>
+    </div>
+  </article>
+
+  <!-- Table of Contents Sidebar (loaded from component) -->
+  <aside class="blog-toc" id="blog-toc"></aside>
+  <script src="/components/blog-toc.js"></script>
+
+</body>
+</html>

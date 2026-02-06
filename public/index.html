@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ankit Badatala - Portfolio</title>
+  <title>Portfolio - Ankit Badatala</title>
   <link rel="stylesheet" href="/styles.css" />
   
   <!-- Preload critical assets for faster rendering -->
@@ -11,6 +11,50 @@
   <link rel="preload" href="/objects/videos/marble-typing-astra.mp4" as="video" type="video/mp4" />
 </head>
 <body>
+
+  <!-- Top Navigation Bar -->
+  <!-- Left: Chat & Call -->
+  <div class="nav-links nav-links-left" id="nav-links-left">
+    <button class="nav-icon chat-icon" id="chat-fab" aria-label="Open chat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+      </svg>
+      <span class="nav-tooltip">Open Chat</span>
+    </button>
+    <button class="nav-icon call-icon" id="call-fab" aria-label="Start Call">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+      </svg>
+      <span class="nav-tooltip">Start Call</span>
+      <span class="rate-limit-badge" id="rate-limit-badge" style="display: none;">!</span>
+    </button>
+  </div>
+
+  <!-- Center: Projects, Blog & Resume -->
+  <div class="nav-links nav-links-center" id="nav-links-center">
+    <a href="/projects.html" class="nav-icon projects-icon" id="projects-fab" aria-label="View Projects">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6 10H6v-2h8v2zm4-4H6v-2h12v2z"/>
+      </svg>
+      <span class="nav-tooltip">View Projects</span>
+    </a>
+    <a href="/blogs.html" class="nav-icon blog-icon" id="blog-fab" aria-label="Read Blog">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+      </svg>
+      <span class="nav-tooltip">Read Blog</span>
+    </a>
+    <button class="nav-icon download-icon" id="download-fab" aria-label="Download Resume">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+      </svg>
+      <span class="nav-tooltip">Download Resume</span>
+    </button>
+  </div>
+
+  <!-- Right: Social Links (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
 
   <div class="frame-container">
     <div class="frame">
@@ -57,35 +101,15 @@
         <div class="waveform-bar"></div>
         <div class="waveform-bar"></div>
       </div>
+      <!-- End call button - appears next to waveform during call -->
+      <button class="end-call-btn" id="end-call-btn" aria-label="End Call">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   </div>
 
-  <!-- Floating Action Buttons -->
-  <div class="fab-container">
-    <button class="fab download-fab" id="download-fab" aria-label="Download Resume">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-      </svg>
-      <span class="fab-tooltip">Download Resume</span>
-    </button>
-    <button class="fab chat-fab" id="chat-fab" aria-label="Open chat">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-      </svg>
-      <span class="fab-tooltip">Open Chat</span>
-    </button>
-    <button class="fab call-fab" id="call-fab" aria-label="Start Call">
-      <svg class="call-icon" width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
-      </svg>
-      <svg class="end-call-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display: none;">
-        <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="fab-tooltip">Start Call</span>
-      <span class="rate-limit-badge" id="rate-limit-badge" style="display: none;">!</span>
-    </button>
-  </div>
-  
   <!-- Rate limit warning toast -->
   <div class="rate-limit-toast" id="rate-limit-toast">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -170,7 +194,11 @@
     const chatFab = document.getElementById('chat-fab');
     const chatCloseBtn = document.getElementById('chat-close-btn');
     const downloadFab = document.getElementById('download-fab');
+    const blogFab = document.getElementById('blog-fab');
     const callFab = document.getElementById('call-fab');
+    const socialLinks = document.querySelector('.social-links');
+    const navLinksLeft = document.querySelector('.nav-links-left');
+    const navLinksCenter = document.querySelector('.nav-links-center');
     const voiceWaveform = document.getElementById('voice-waveform');
     const waveformBars = document.querySelectorAll('.waveform-bar');
     
@@ -228,12 +256,20 @@
     function openChat() {
       frameContainer.classList.add('chat-open');
       chatPanel.classList.add('open');
+      // Hide ALL navigation icons
+      if (socialLinks) socialLinks.classList.add('social-links-hidden');
+      if (navLinksCenter) navLinksCenter.classList.add('nav-links-hidden');
+      if (navLinksLeft) navLinksLeft.classList.add('nav-links-hidden');
       chatInput.focus();
     }
 
     function closeChat() {
       frameContainer.classList.remove('chat-open');
       chatPanel.classList.remove('open');
+      // Show ALL navigation icons
+      if (socialLinks) socialLinks.classList.remove('social-links-hidden');
+      if (navLinksCenter) navLinksCenter.classList.remove('nav-links-hidden');
+      if (navLinksLeft) navLinksLeft.classList.remove('nav-links-hidden');
     }
 
     // Floating chat button
@@ -748,7 +784,8 @@
           }
           
           voiceState = 'processing';
-          updateWaveformState('processing');
+          // Don't show processing animation yet — wait until LLM is actually called
+          // This prevents showing "thinking" when the pipeline is stuck connecting to TTS
           stopAudioPlayback();
           audioInterrupted = false;
           processAndSpeak(transcript);
@@ -1052,6 +1089,22 @@
         // Connect TTS (speaking state will be set when first audio chunk is queued)
         await connectTTS(deepgramToken);
         
+        // TTS connected — NOW show processing animation (LLM is about to be called)
+        if (voiceState === 'processing') {
+          updateWaveformState('processing');
+          
+          // Safety timeout: if stuck in processing for 15s without audio, revert to listening
+          if (processingTimeout) clearTimeout(processingTimeout);
+          processingTimeout = setTimeout(() => {
+            if (voiceState === 'processing') {
+              console.warn('Processing timeout (15s) — no audio received, reverting to listening');
+              voiceState = 'listening';
+              updateWaveformState('listening');
+              isProcessingResponse = false;
+            }
+          }, 15000);
+        }
+        
         // Stream LLM response and send to TTS
         const response = await fetch('/api/voice/chat', {
           method: 'POST',
@@ -1119,10 +1172,20 @@
         console.error('Error in processAndSpeak:', error);
         // Only close TTS on error
         closeTTS();
+        // Reset waveform if stuck in processing (pipeline failed before audio started)
+        if (voiceState === 'processing') {
+          voiceState = 'listening';
+          updateWaveformState('listening');
+        }
       } finally {
         // Don't close TTS here - keep it open for reuse to avoid rate limits
         // TTS will be closed when call ends or on interruption
         isProcessingResponse = false;
+        // Clear processing timeout if still active
+        if (processingTimeout) {
+          clearTimeout(processingTimeout);
+          processingTimeout = null;
+        }
         // Note: voiceState transitions to 'listening' happens in queueAudio's onended callback
         // when all audio finishes playing, ensuring accurate waveform timing
       }
@@ -1179,6 +1242,7 @@
     let nextPlayTime = 0;
     let activeSources = [];  // Track ALL active audio sources
     let hasStartedSpeaking = false;  // Track if we've shown speaking state
+    let processingTimeout = null;  // Auto-revert if stuck in processing state
     
     function queueAudio(audioBuffer) {
       const ctx = initPlaybackContext();
@@ -1207,6 +1271,11 @@
         hasStartedSpeaking = true;
         voiceState = 'speaking';
         updateWaveformState('speaking');
+        // Clear processing timeout — we're no longer stuck
+        if (processingTimeout) {
+          clearTimeout(processingTimeout);
+          processingTimeout = null;
+        }
         console.log('Audio playback started - showing speaking animation');
       }
       
@@ -1562,84 +1631,87 @@
       hideWaveform();
       voiceState = 'idle';
       audioInterrupted = false;
+      // Clear any pending processing timeout
+      if (processingTimeout) {
+        clearTimeout(processingTimeout);
+        processingTimeout = null;
+      }
       console.log('Voice call ended');
     }
 
-    // Floating call button
+    // End call button (next to waveform)
+    const endCallBtn = document.getElementById('end-call-btn');
+
+    // Helper to hide all nav icons
+    function hideAllNavIcons() {
+      if (navLinksLeft) navLinksLeft.classList.add('nav-links-hidden');
+      if (navLinksCenter) navLinksCenter.classList.add('nav-links-hidden');
+      if (socialLinks) socialLinks.classList.add('social-links-hidden');
+    }
+
+    // Helper to show all nav icons
+    function showAllNavIcons() {
+      if (navLinksLeft) navLinksLeft.classList.remove('nav-links-hidden');
+      if (navLinksCenter) navLinksCenter.classList.remove('nav-links-hidden');
+      if (socialLinks) socialLinks.classList.remove('social-links-hidden');
+    }
+
+    // Floating call button - starts call only
     callFab.addEventListener('click', async () => {
-      const callIcon = callFab.querySelector('.call-icon');
-      const endCallIcon = callFab.querySelector('.end-call-icon');
-      const tooltip = callFab.querySelector('.fab-tooltip');
+      if (isInCall) return; // Already in call
       
-      if (!isInCall) {
-        // Start call - trigger call answer flow
-        isInCall = true;
-        
-        // Hide other FABs
-        downloadFab.classList.add('fab-hidden');
-        chatFab.classList.add('fab-hidden');
-        
-        // Switch to X icon
-        callIcon.style.display = 'none';
-        endCallIcon.style.display = 'block';
-        tooltip.textContent = 'End Call';
-        callFab.classList.add('call-active');
-        
-        // Trigger call answer video
-        callEndVideo.classList.remove('active');
-        callEndVideo.pause();
-        callAnswerVideo.currentTime = 0;
-        callAnswerVideo.classList.add('active');
-        callAnswerVideo.play();
-        
-        // Start voice call
-        try {
-          await startVoiceCall();
-        } catch (error) {
-          // Revert UI on failure
-          isInCall = false;
-          downloadFab.classList.remove('fab-hidden');
-          chatFab.classList.remove('fab-hidden');
-          callIcon.style.display = 'block';
-          endCallIcon.style.display = 'none';
-          tooltip.textContent = 'Start Call';
-          callFab.classList.remove('call-active');
-          hideAllOverlays();
-          alert(error.message || 'Failed to start voice call. Please check microphone permissions.');
-        }
-        
-      } else {
-        // End call - trigger call end flow
+      // Start call - trigger call answer flow
+      isInCall = true;
+      
+      // Hide ALL nav icons during call
+      hideAllNavIcons();
+      
+      // Trigger call answer video
+      callEndVideo.classList.remove('active');
+      callEndVideo.pause();
+      callAnswerVideo.currentTime = 0;
+      callAnswerVideo.classList.add('active');
+      callAnswerVideo.play();
+      
+      // Start voice call
+      try {
+        await startVoiceCall();
+      } catch (error) {
+        // Revert UI on failure
         isInCall = false;
-        
-        // End voice call
-        endVoiceCall();
-        
-        // Show other FABs
-        downloadFab.classList.remove('fab-hidden');
-        chatFab.classList.remove('fab-hidden');
-        
-        // Switch back to phone icon
-        callIcon.style.display = 'block';
-        endCallIcon.style.display = 'none';
-        tooltip.textContent = 'Start Call';
-        callFab.classList.remove('call-active');
-        
-        // Trigger call end video
-        callEndVideo.currentTime = 0;
-        callEndVideo.classList.add('active');
-        callEndVideo.play().then(() => {
-          setTimeout(() => {
-            callAnswerVideo.classList.remove('active');
-            callAnswerVideo.pause();
-          }, 200);
-        });
-        
-        callEndVideo.addEventListener('ended', function hideCallEnd() {
-          callEndVideo.classList.remove('active');
-          callEndVideo.removeEventListener('ended', hideCallEnd);
-        }, { once: true });
+        showAllNavIcons();
+        hideAllOverlays();
+        alert(error.message || 'Failed to start voice call. Please check microphone permissions.');
       }
+    });
+
+    // End call button (next to waveform) - ends call
+    endCallBtn.addEventListener('click', () => {
+      if (!isInCall) return;
+      
+      // End call - trigger call end flow
+      isInCall = false;
+      
+      // End voice call
+      endVoiceCall();
+      
+      // Show ALL nav icons
+      showAllNavIcons();
+      
+      // Trigger call end video
+      callEndVideo.currentTime = 0;
+      callEndVideo.classList.add('active');
+      callEndVideo.play().then(() => {
+        setTimeout(() => {
+          callAnswerVideo.classList.remove('active');
+          callAnswerVideo.pause();
+        }, 200);
+      });
+      
+      callEndVideo.addEventListener('ended', function hideCallEnd() {
+        callEndVideo.classList.remove('active');
+        callEndVideo.removeEventListener('ended', hideCallEnd);
+      }, { once: true });
     });
   </script>
 

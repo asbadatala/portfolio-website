@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Top 3 Productivity Tools of 2026 (One Month In) - Ankit Badatala</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="blog-page">
+
+  <!-- Social Links - Top Right (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
+
+  <!-- Back Button (loaded from component) -->
+  <!-- Home Button (loaded from component) -->
+  <a class="home-button" id="home-button"></a>
+  <script src="/components/back-button.js"></script>
+
+  <!-- Table of Contents Sidebar (loaded from component) -->
+  <aside class="blog-toc" id="blog-toc"></aside>
+  <script src="/components/blog-toc.js"></script>
+
+  <!-- Blog Post Container -->
+  <article class="blog-post-container">
+    <header class="blog-post-header">
+      <span class="blog-post-date">February 2026</span>
+      <h1>My Top 3 Productivity Tools of 2026 (One Month In)</h1>
+      <p class="blog-post-subtitle">What each tool replaced, when it's worth it, one weekly workflow, and one gotcha.</p>
+    </header>
+
+    <div class="blog-post-content">
+      <p>I'm not ranking "cool AI." I'm ranking tools that measurably reduce time lost to (1) being away from my laptop, (2) writing friction, and (3) research/tab chaos.</p>
+
+      <p>Below: what each tool replaced for me, when it's worth it, one weekly workflow, one gotcha—and any published productivity claims the teams themselves put on their sites.</p>
+
+      <hr>
+
+      <h2>1) Cursor Agents (web + mobile)</h2>
+
+      <h3>What it replaces</h3>
+      <ul>
+        <li>"I'll do it when I'm back at my desk."</li>
+        <li>Small-but-blocking tasks: scaffolding, refactors, tests, renames, wiring endpoints, docs.</li>
+      </ul>
+
+      <p>Cursor explicitly positions Agents on web/mobile as a way to keep working "wherever you are," not just inside the IDE.</p>
+
+      <h3>Productivity / stats (from Cursor)</h3>
+      <ul>
+        <li>Cursor published a write-up referencing a University of Chicago study claiming companies merge <strong>39% more pull requests</strong> after Cursor's agent became the default.</li>
+      </ul>
+
+      <p><strong>Important context</strong> (so you don't overgeneralize): There are also rigorous studies showing AI tools can make some dev workflows slower (e.g., an RCT with experienced OSS devs reported ~19% longer with AI tools). Different setting, different task mix—but worth knowing.</p>
+
+      <h3>When it's worth it / when it's not</h3>
+      <p><strong>Worth it:</strong> clear tasks + fast feedback (tests/build/typecheck).<br>
+      <strong>Not worth it:</strong> ambiguous product decisions or anything you can't verify quickly.</p>
+
+      <h3>One workflow I use weekly</h3>
+      <p><strong>"Mobile triage → laptop finish"</strong></p>
+      <ul>
+        <li>On phone: assign a bounded task ("implement X + tests; keep changes minimal").</li>
+        <li>On laptop: run the suite, review diff, merge.</li>
+      </ul>
+
+      <h3>One gotcha</h3>
+      <p>If you don't constrain scope, the agent will happily do "too much." The fix: require a short plan first, then implement. (Cursor's own docs emphasize working with context + iterative instructions.)</p>
+
+      <hr>
+
+      <h2>2) Willow Voice (cross-app dictation)</h2>
+
+      <h3>What it replaces</h3>
+      <ul>
+        <li>Typing first drafts of emails, Slack messages, and outlines.</li>
+        <li>The "blank page" slowdown—especially when I already know what I want to say.</li>
+      </ul>
+
+      <h3>Productivity / stats (from Willow)</h3>
+      <ul>
+        <li>Willow's homepage claim: <strong>"write 5× faster with voice."</strong></li>
+        <li>Their product positioning also centers on extremely fast responsiveness; one post claims speech-to-text appears "typically within 200 ms" (their words).</li>
+      </ul>
+
+      <h3>When it's worth it / when it's not</h3>
+      <p><strong>Worth it:</strong> emails, status updates, feedback, outlines, "explain this" writing.<br>
+      <strong>Not worth it:</strong> precision writing where you'll edit heavily anyway, or anywhere you can't comfortably speak.</p>
+
+      <h3>One workflow I use weekly</h3>
+      <p><strong>"Voice-first draft → 2-minute edit"</strong></p>
+      <ul>
+        <li>Dictate the messy version (fast).</li>
+        <li>Quick edit for structure and tone (short).</li>
+      </ul>
+
+      <h3>One gotcha</h3>
+      <p>Dictation is only "fast" if you do a quick review before sending. Voice tools can introduce subtle errors (names, numbers, negations) that matter.</p>
+
+      <hr>
+
+      <h2>3) Dia Browser (chat with tabs)</h2>
+
+      <h3>What it replaces</h3>
+      <ul>
+        <li>Copy/pasting links into a separate chat tool.</li>
+        <li>Re-reading the same tabs to synthesize a conclusion.</li>
+        <li>"Open 15 tabs, forget why I opened 12 of them."</li>
+      </ul>
+
+      <p>Dia's core pitch is "Chat with your tabs" and "learn and plan faster."</p>
+
+      <h3>Productivity / stats (from Dia)</h3>
+      <ul>
+        <li>I couldn't find a concrete published number like "X% faster" on Dia's official site—their claims are qualitative ("learn and plan faster").</li>
+        <li>What is concrete: they keep shipping features built around treating tab groups as "context containers" you can attach to chat.</li>
+      </ul>
+
+      <h3>When it's worth it / when it's not</h3>
+      <p><strong>Worth it:</strong> multi-tab research, comparisons, "turn this into a plan," summarizing docs.<br>
+      <strong>Not worth it:</strong> single-page lookups or anything where you don't need synthesis.</p>
+
+      <h3>One workflow I use weekly</h3>
+      <p><strong>"Tabs → decision memo"</strong></p>
+      <ul>
+        <li>Open the docs + alternatives + pricing + a couple deep dives.</li>
+        <li>Ask Dia to compare tradeoffs and produce a recommendation + next steps.</li>
+        <li>Copy into a short memo I can act on.</li>
+      </ul>
+
+      <h3>One gotcha</h3>
+      <p>AI browsers are powerful because they can "see" your context—which means you should be intentional about what tabs you keep open when you query.</p>
+
+      <hr>
+
+      <h2>The Short Takeaway</h2>
+      
+      <ul>
+        <li><strong>Cursor Agents:</strong> biggest win when you're away from your laptop and need forward progress.</li>
+        <li><strong>Willow:</strong> biggest win when writing is the bottleneck (it's trying to replace the keyboard, not just add dictation).</li>
+        <li><strong>Dia:</strong> biggest win when research/synthesis is the bottleneck and your "work" is spread across tabs.</li>
+      </ul>
+
+      <p>None of these tools are magic. They're force multipliers for specific bottlenecks. If you don't have those bottlenecks, you probably don't need the tool.</p>
+
+      <p>I'll revisit this list in six months and see what stuck.</p>
+    </div>
+  </article>
+
+</body>
+</html>

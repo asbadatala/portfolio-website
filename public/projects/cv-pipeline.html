@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CV Dashboard Pipeline - Ankit Badatala</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="blog-page">
+
+  <!-- Social Links - Top Right (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
+
+  <!-- Back Button (loaded from component) -->
+  <!-- Home Button (loaded from component) -->
+  <a class="home-button" id="home-button"></a>
+  <script src="/components/back-button.js"></script>
+
+  <!-- Project Post Container (reusing blog post styles) -->
+  <article class="blog-post-container">
+    <header class="blog-post-header">
+      <span class="blog-post-date">2025</span>
+      <h1>CV Dashboard Pipeline</h1>
+      <p class="blog-post-subtitle">An image-to-dashboard computer vision pipeline that converts screenshots into interactive analytics.</p>
+    </header>
+
+    <div class="blog-post-content">
+      <h2 id="overview">Overview</h2>
+      <p>
+        This project was built at Strategy to help businesses extract structured data from dashboard screenshots. Users upload an image of a chart or dashboard, and the system automatically identifies the visualization type, extracts data points, and generates an interactive version.
+      </p>
+
+      <h2 id="tech-stack">Tech Stack</h2>
+      <ul>
+        <li><strong>Computer Vision:</strong> Custom PyTorch models for chart classification</li>
+        <li><strong>OCR:</strong> Tesseract + custom post-processing for data extraction</li>
+        <li><strong>Data Processing:</strong> pandas for structured data manipulation</li>
+        <li><strong>Visualization:</strong> Plotly for interactive chart generation</li>
+        <li><strong>Backend:</strong> FastAPI with async processing</li>
+        <li><strong>Infrastructure:</strong> AWS Lambda + S3 for scalable processing</li>
+      </ul>
+
+      <h2 id="key-features">Key Features</h2>
+      <ul>
+        <li><strong>Chart classification:</strong> Automatically detects bar, line, pie, and scatter charts</li>
+        <li><strong>Data extraction:</strong> Pulls numerical values and labels from images</li>
+        <li><strong>Interactive output:</strong> Generates zoomable, hoverable Plotly charts</li>
+        <li><strong>Batch processing:</strong> Handles multiple images in parallel</li>
+        <li><strong>Export formats:</strong> CSV, JSON, and embeddable HTML</li>
+      </ul>
+
+      <h2 id="challenges">Challenges & Solutions</h2>
+      <p>
+        The main challenges were handling low-quality screenshots and dealing with the variety of chart styles. I addressed these by:
+      </p>
+      <ul>
+        <li>Training on a diverse dataset of real-world dashboard screenshots</li>
+        <li>Implementing robust image preprocessing (denoising, contrast enhancement)</li>
+        <li>Building confidence scoring to flag uncertain extractions for human review</li>
+      </ul>
+
+      <h2 id="results">Results</h2>
+      <p>
+        The pipeline achieved 92% accuracy on chart classification and 87% accuracy on data extraction. It's now used by multiple enterprise clients to digitize legacy reports and dashboards.
+      </p>
+    </div>
+  </article>
+
+  <!-- Table of Contents Sidebar (loaded from component) -->
+  <aside class="blog-toc" id="blog-toc"></aside>
+  <script src="/components/blog-toc.js"></script>
+
+</body>
+</html>

@@ -50,7 +50,7 @@ async def voice_chat(request: VoiceChatRequest):
     logger.info(f"Voice chat processing (session: {session_id}): {message[:80]}...")
     
     # Start context retrieval in parallel
-    context_task = asyncio.create_task(retrieve_context(message, k=6))
+    context_task = asyncio.create_task(retrieve_context(message, k=4))
     
     # Get history and save user message
     chat_history = ""

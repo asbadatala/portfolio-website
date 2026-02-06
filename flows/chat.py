@@ -45,7 +45,7 @@ class ChatFlow:
         else:
             history_task = None
         
-        context_task = asyncio.create_task(retrieve_context(message, k=6))
+        context_task = asyncio.create_task(retrieve_context(message, k=4))
         
         # Background save user message (non-blocking)
         if self.session_id:

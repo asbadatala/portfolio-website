@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>How I Built a Streaming Voice AI Pipeline End-to-End - Ankit Badatala</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="blog-page">
+
+  <!-- Social Links - Top Right (loaded from component) -->
+  <div class="social-links" id="social-links"></div>
+  <script src="/components/social-links.js"></script>
+
+  <!-- Back Button (loaded from component) -->
+  <!-- Home Button (loaded from component) -->
+  <a class="home-button" id="home-button"></a>
+  <script src="/components/back-button.js"></script>
+
+  <!-- Table of Contents Sidebar (loaded from component) -->
+  <aside class="blog-toc" id="blog-toc"></aside>
+  <script src="/components/blog-toc.js"></script>
+
+  <!-- Blog Post Container -->
+  <article class="blog-post-container">
+    <header class="blog-post-header">
+      <span class="blog-post-date">February 2026</span>
+      <h1>How I Built a Streaming Voice AI Pipeline End-to-End</h1>
+      <p class="blog-post-subtitle">Real-time speech recognition, LLM inference, and text-to-speech in the browser—with interruption support and sub-second latency.</p>
+    </header>
+
+    <div class="blog-post-content">
+      <p><em>This is what worked for my stack, my constraints, and my latency targets. Your mileage may vary—but hopefully this gives you a concrete starting point if you're building something similar.</em></p>
+
+      <h2>What I Was Building</h2>
+      <p>I wanted to add a voice interface to my portfolio site. Not a gimmick—a genuinely useful way for recruiters or collaborators to ask questions about my work without reading walls of text.</p>
+      
+      <p>The user experience goals were specific:</p>
+      <ul>
+        <li><strong>Natural conversation flow</strong>—no "press to talk" buttons, no awkward silences while waiting for responses</li>
+        <li><strong>Interruption support</strong>—if the AI is rambling, the user should be able to cut it off mid-sentence</li>
+        <li><strong>Low perceived latency</strong>—audio should start playing within ~1 second of the user finishing their question</li>
+        <li><strong>Browser-only client</strong>—no native app, no desktop requirements</li>
+      </ul>
+
+      <p>The constraint that shaped everything: <strong>my site runs on Vercel serverless functions</strong>, which don't support WebSockets. This ruled out the obvious architecture of routing all audio through my server.</p>
+
+      <h2>Architecture Overview</h2>
+      <p>Here's what I ended up with:</p>
+
+      <pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                         BROWSER                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │   Mic       │───▶│  STT WS     │───▶│  Transcript │         │
+│  │   Capture   │    │  (Deepgram) │    │             │         │
+│  └─────────────┘    └─────────────┘    └──────┬──────┘         │
+│                                                │                 │
+│                                                ▼                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│  │   Speaker   │◀───│  TTS WS     │◀───│  LLM Call   │◀────────│
+│  │   Playback  │    │  (Deepgram) │    │  (Vercel)   │         │
+│  └─────────────┘    └─────────────┘    └─────────────┘         │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+
+      <p>The key insight: <strong>the browser is the orchestrator</strong>. It connects directly to Deepgram's WebSocket APIs for both speech-to-text (Flux) and text-to-speech (Aura). Vercel only handles two short-lived HTTP requests:</p>
+      <ol>
+        <li><strong>Token endpoint</strong>—returns a Deepgram API key for the client to use</li>
+        <li><strong>LLM endpoint</strong>—receives transcript, returns streamed response text</li>
+      </ol>
+
+      <p>This sidesteps the "Vercel can't do WebSockets" problem entirely. The client maintains the real-time connections; the server just does quick request-response work.</p>
+
+      <h2>Streaming Design Choices</h2>
+
+      <h3>WebSockets vs SSE</h3>
+      <p>For the audio streams (STT and TTS), WebSockets were the only real option. You need bidirectional, binary-capable connections for real-time audio. SSE is text-only and unidirectional—fine for streaming LLM tokens, not for 16kHz PCM audio frames.</p>
+
+      <p>For the LLM call, I use a standard HTTP POST that returns a streaming response. The browser reads it chunk by chunk and pipes each text fragment to the TTS WebSocket. This works fine because text tokens are small and infrequent compared to audio frames.</p>
+
+      <h3>Audio Format and Frame Cadence</h3>
+      <p>I settled on <strong>linear16 PCM at 16kHz</strong> for both STT input and TTS output. It's the format Deepgram works with natively, and it avoids transcoding overhead.</p>
+
+      <p>On the capture side, the browser's <code>MediaRecorder</code> API doesn't give you raw PCM, so I use a <code>ScriptProcessorNode</code> (yes, it's deprecated—<code>AudioWorklet</code> is the future, but browser support is still uneven). I pull 4096-sample buffers (~256ms at 16kHz), convert float32 to int16, and send them over the WebSocket.</p>
+
+      <p>Frame size is a tradeoff:</p>
+      <ul>
+        <li><strong>Smaller frames</strong> = lower latency, but more WebSocket overhead and more packets to process</li>
+        <li><strong>Larger frames</strong> = fewer packets, but you're buffering more audio before sending</li>
+      </ul>
+
+      <p>256ms frames felt like a reasonable middle ground. Deepgram's STT handles them fine, and the latency contribution is acceptable.</p>
+
+      <h3>Backpressure and Buffering</h3>
+      <p>The TTS stream is where buffering gets interesting. Deepgram generates audio faster than real-time playback, so chunks pile up on the client. I queue them in an array and schedule playback using the Web Audio API's <code>AudioBufferSourceNode.start(when)</code> method.</p>
+
+      <p>The <code>when</code> parameter is the key to seamless playback. Each chunk is scheduled to start exactly when the previous chunk ends:</p>
+
+      <pre><code>let nextStartTime = audioContext.currentTime;
+
+function queueAudioChunk(buffer) {
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  
+  // Schedule to start right after previous chunk
+  const startTime = Math.max(nextStartTime, audioContext.currentTime);
+  source.start(startTime);
+  
+  // Update for next chunk
+  nextStartTime = startTime + buffer.duration;
+}</code></pre>
+
+      <p>Without precise scheduling, you get audible gaps or overlaps between chunks. The browser's audio clock handles this better than any JavaScript timer could.</p>
+
+      <h2>Latency Budget</h2>
+      <p>Here's roughly where the time goes for a typical exchange:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Stage</th>
+            <th style="text-align: right;">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>User finishes speaking → Deepgram detects end-of-turn</td>
+            <td style="text-align: right;">200-400ms</td>
+          </tr>
+          <tr>
+            <td>Final transcript arrives at browser</td>
+            <td style="text-align: right;">50-100ms</td>
+          </tr>
+          <tr>
+            <td>HTTP request to Vercel LLM endpoint</td>
+            <td style="text-align: right;">100-200ms</td>
+          </tr>
+          <tr>
+            <td>LLM generates first tokens</td>
+            <td style="text-align: right;">300-500ms</td>
+          </tr>
+          <tr>
+            <td>TTS WebSocket connection + first audio chunk</td>
+            <td style="text-align: right;">200-300ms</td>
+          </tr>
+          <tr>
+            <td><strong>Total: user stops talking → audio starts</strong></td>
+            <td style="text-align: right;"><strong>~1-1.5s</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>This is perceptibly fast enough to feel like a conversation rather than a query-response system. The streaming helps a lot—you hear the first word before the LLM has finished generating the full response.</p>
+
+      <h2>Interruptions and Barge-In</h2>
+      <p>This was the trickiest part to get right. The goal: if the user starts talking while the AI is still speaking, immediately stop the AI and listen to the user.</p>
+
+      <h3>Detection</h3>
+      <p>Deepgram Flux sends a <code>StartOfTurn</code> event when it detects the user has begun speaking. I listen for this event even while TTS audio is playing.</p>
+
+      <h3>Cancellation Semantics</h3>
+      <p>When an interruption is detected, I cancel everything in flight:</p>
+      <ol>
+        <li><strong>Stop all scheduled audio</strong>—call <code>.stop()</code> on every queued <code>AudioBufferSourceNode</code></li>
+        <li><strong>Close the TTS WebSocket</strong>—no point receiving more audio we won't play</li>
+        <li><strong>Abort the LLM fetch</strong>—use an <code>AbortController</code> to cancel the in-flight HTTP request</li>
+        <li><strong>Clear the audio queue</strong>—discard any buffered chunks</li>
+        <li><strong>Update UI state</strong>—switch waveform from "speaking" to "listening"</li>
+      </ol>
+
+      <p>All of this happens synchronously in the <code>StartOfTurn</code> handler. The latency from "user starts talking" to "AI shuts up" is typically under 100ms—fast enough that it feels responsive rather than sluggish.</p>
+
+      <h3>Avoiding "Talking Over the User"</h3>
+      <p>The other failure mode is the AI starting to respond while the user is still mid-sentence. Deepgram Flux handles this with turn detection. It doesn't fire <code>EndOfTurn</code> until there's a natural pause—not just silence, but a semantic break in the speech.</p>
+
+      <p>I also added a flag (<code>isProcessingResponse</code>) that prevents new LLM calls from starting if one is already in flight. This avoids race conditions where a partial transcript triggers a response that gets interrupted by the final transcript.</p>
+
+      <h2>What Broke Under Load</h2>
+      <p>I didn't do formal load testing, but I did find the failure modes through regular use:</p>
+
+      <h3>Deepgram Rate Limits (429 Errors)</h3>
+      <p>The biggest issue. Deepgram has concurrency limits on TTS WebSocket connections. Even with a single user, rapid-fire questions could exhaust the quota if previous connections weren't properly closed.</p>
+
+      <p><strong>Fix:</strong> Explicit connection lifecycle management. I track active connections, enforce a minimum interval between new connections (5 seconds), and always call <code>close(1000)</code> with a clean status code before opening a new one. I also added retry logic with exponential backoff (1s, 2s, 4s, 8s) for transient failures.</p>
+
+      <h3>Audio Artifacts on Interruption</h3>
+      <p>Early versions would sometimes play a fraction of a syllable after interruption—jarring. The issue was that <code>AudioBufferSourceNode.stop()</code> doesn't take effect until the next audio processing quantum (~3ms).</p>
+
+      <p><strong>Fix:</strong> Call <code>stop()</code> with an explicit time slightly in the future (<code>audioContext.currentTime + 0.01</code>), which ensures the stop is processed cleanly.</p>
+
+      <h3>Memory Leaks in Long Sessions</h3>
+      <p>The audio queue could grow unbounded if chunks arrived faster than they were played. Not a problem for short interactions, but noticeable in 10+ minute sessions.</p>
+
+      <p><strong>Fix:</strong> Prune the queue when chunks complete playback. Each <code>AudioBufferSourceNode</code> has an <code>onended</code> callback—use it to remove the chunk from tracking.</p>
+
+      <h2>What I'd Improve Next</h2>
+      <p>The current implementation works, but there's room to grow:</p>
+
+      <ul>
+        <li><strong>AudioWorklet migration</strong>—<code>ScriptProcessorNode</code> runs on the main thread and can cause audio glitches during heavy JS execution. AudioWorklet runs in a separate thread.</li>
+        <li><strong>Opus encoding</strong>—sending raw PCM over WebSocket is bandwidth-inefficient. Opus would cut bandwidth by ~10x with minimal latency cost.</li>
+        <li><strong>Voice activity detection on the client</strong>—right now I send all audio to Deepgram, even silence. Client-side VAD could reduce costs and server load.</li>
+        <li><strong>Speculative TTS</strong>—start generating audio for the first few tokens before the full LLM response is ready. This could shave another 200-300ms off perceived latency.</li>
+        <li><strong>Better error recovery</strong>—currently, if the TTS connection fails mid-response, the user gets silence. It should gracefully fall back or retry.</li>
+      </ul>
+
+      <h2>Closing Thoughts</h2>
+      <p>Building real-time voice AI is mostly about managing state transitions and timing. The ML parts (STT, LLM, TTS) are largely commoditized—you call an API and get results. The engineering challenge is stitching them together into something that feels natural.</p>
+
+      <p>The key lessons:</p>
+      <ul>
+        <li><strong>Streaming everywhere</strong>—batch processing adds latency at every stage</li>
+        <li><strong>The browser can do a lot</strong>—don't assume you need a custom backend for real-time audio</li>
+        <li><strong>Interruption is table stakes</strong>—without it, voice interfaces feel broken</li>
+        <li><strong>Test with real speech</strong>—simulated audio doesn't reveal the timing edge cases</li>
+      </ul>
+
+      <p>Try the voice feature on my portfolio and let me know what breaks. That's the best kind of feedback.</p>
+    </div>
+  </article>
+
+</body>
+</html>
