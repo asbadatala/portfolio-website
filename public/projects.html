@@ -28,17 +28,24 @@
       <!-- Voice AI Portfolio -->
       <div class="carousel-card active" data-index="0">
         <div class="card-image">
-          <img src="/objects/projects/voice-ai-thumb.png" alt="Voice AI Portfolio" />
+          <img src="/objects/projects/AI Portfolio Website/thumbnail.png" alt="Voice AI Portfolio" />
         </div>
-        <h3 class="card-title">Voice AI Portfolio</h3>
-        <p class="card-description">A streaming voice assistant that lets visitors talk to my portfolio using real-time speech recognition and synthesis.</p>
+        <h3 class="card-title">AI-Powered Portfolio Website</h3>
+        <p class="card-description">An interactive portfolio powered by a chatbot + real-time voice assistant.</p>
+        <p class="card-description">Learn about me through natural conversation, not skimming a PDF.</p>
         <div class="card-links">
-          <a href="/" class="card-link" title="Demo">
+          <a href="https://ankitsdesk.vercel.app/" target="_blank" rel="noopener noreferrer" class="card-link" title="Visit Site">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Demo
+            Visit
           </a>
+          <button class="card-link card-link-button" id="demo-video-btn" title="Demo Video">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Demo
+          </button>
           <a href="/blog/streaming-voice-ai-pipeline.html" class="card-link" title="Blog Post">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
@@ -58,6 +65,22 @@
 
   </div>
 
+  <!-- Video Modal -->
+  <div class="video-modal" id="video-modal">
+    <div class="video-modal-overlay" id="video-modal-overlay"></div>
+    <div class="video-modal-content">
+      <button class="video-modal-close" id="video-modal-close" aria-label="Close video">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <video class="video-modal-player" id="video-modal-player" controls>
+        <source src="/objects/videos/portfolio-demo.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
   <script>
     // Single project - just ensure it's marked as active
     const carousel = document.getElementById('carousel');
@@ -67,6 +90,47 @@
     if (cards.length > 0) {
       cards[0].classList.add('active');
     }
+
+    // Video Modal Functionality
+    const demoVideoBtn = document.getElementById('demo-video-btn');
+    const videoModal = document.getElementById('video-modal');
+    const videoModalOverlay = document.getElementById('video-modal-overlay');
+    const videoModalClose = document.getElementById('video-modal-close');
+    const videoPlayer = document.getElementById('video-modal-player');
+
+    function openVideoModal() {
+      videoModal.classList.add('active');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      videoPlayer.play();
+    }
+
+    function closeVideoModal() {
+      videoModal.classList.remove('active');
+      document.body.style.overflow = ''; // Restore scrolling
+      videoPlayer.pause();
+      videoPlayer.currentTime = 0; // Reset video
+    }
+
+    // Open modal when demo button is clicked
+    if (demoVideoBtn) {
+      demoVideoBtn.addEventListener('click', openVideoModal);
+    }
+
+    // Close modal when overlay or close button is clicked
+    if (videoModalOverlay) {
+      videoModalOverlay.addEventListener('click', closeVideoModal);
+    }
+
+    if (videoModalClose) {
+      videoModalClose.addEventListener('click', closeVideoModal);
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && videoModal.classList.contains('active')) {
+        closeVideoModal();
+      }
+    });
   </script>
 
 </body>

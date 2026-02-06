@@ -129,14 +129,20 @@ UPSTASH_REDIS_REST_TOKEN=...
 
 # Deepgram (for Voice AI)
 DEEPGRAM_API_KEY=...
+DEEPGRAM_PROJECT_ID=...
+
+# Security (optional — defaults to production domain)
+# ALLOWED_ORIGINS=https://ankitsdesk.vercel.app
 ```
 
 ## API
 
+All endpoints are rate-limited per IP using Upstash Redis.
+
 - **`POST /api/session`**: Returns a session ID
-- **`POST /api/chat`**: Streams an SSE response (`text/event-stream`)
-- **`GET /api/deepgram-token`**: Returns Deepgram API key for client-side voice
-- **`POST /api/voice/chat`**: Streams LLM response for voice (plain text)
+- **`POST /api/chat`**: Streams an SSE response (`text/event-stream`) — 20 req/min
+- **`GET /api/deepgram-token`**: Mints a short-lived Deepgram key (30s TTL) — 5 req/min
+- **`POST /api/voice/chat`**: Streams LLM response for voice (plain text) — 20 req/min
 - **`GET /api/health`**: Health check
 
 ## How it works

@@ -110,13 +110,13 @@
     </div>
   </div>
 
-  <!-- Rate limit warning toast -->
-  <div class="rate-limit-toast" id="rate-limit-toast">
+  <!-- Toast notification (general purpose) -->
+  <div class="rate-limit-toast" id="toast-notification">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="10"/>
       <path d="M12 8v4M12 16h.01"/>
     </svg>
-    <span>Voice busy - please wait a moment</span>
+    <span id="toast-message">Please wait a moment</span>
   </div>
 
   <!-- Chat Window - degree-guru style -->
@@ -406,6 +406,15 @@
           signal: abortController.signal
         });
         
+        if (response.status === 429) {
+          hideTypingIndicator();
+          addMessage('You\'re sending messages too fast. Please wait a moment and try again.', false);
+          showToast('Rate limit reached — please wait before sending another message', 6000);
+          setStreamingMode(false);
+          chatInput.focus();
+          return;
+        }
+        
         if (!response.ok) {
           hideTypingIndicator();
           addMessage('Sorry, something went wrong. Please try again.', false);
@@ -679,9 +688,15 @@
       stopSpeakingSimulation();
     }
     
-    // Get Deepgram token from server (keeps API key server-side)
+    // Get Deepgram token from server (mints a short-lived key)
     async function getDeepgramToken() {
       const response = await fetch('/api/deepgram-token');
+      if (response.status === 429) {
+        const data = await response.json().catch(() => ({}));
+        const retryAfter = data?.detail?.retry_after || 60;
+        showToast(`Too many requests — please wait ${retryAfter}s before starting a new call`, 7000);
+        throw new Error(`Too many requests. Please wait ${retryAfter} seconds and try again.`);
+      }
       if (!response.ok) {
         throw new Error('Failed to get Deepgram token');
       }
@@ -836,25 +851,40 @@
       }
     }
     
-    // Rate limit warning UI
+    // Toast notification system
+    const toastEl = document.getElementById('toast-notification');
+    const toastMsg = document.getElementById('toast-message');
+    let toastTimer = null;
+    
+    function showToast(message, duration = 5000) {
+      if (!toastEl || !toastMsg) return;
+      toastMsg.textContent = message;
+      toastEl.classList.add('visible');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastEl.classList.remove('visible');
+        toastTimer = null;
+      }, duration);
+    }
+    
+    function hideToast() {
+      if (toastEl) toastEl.classList.remove('visible');
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    }
+    
+    // Rate limit warning UI (voice TTS-specific, uses toast + badge)
     const rateLimitBadge = document.getElementById('rate-limit-badge');
-    const rateLimitToast = document.getElementById('rate-limit-toast');
     
     function showRateLimitWarning() {
       console.log('Showing rate limit warning');
       if (rateLimitBadge) rateLimitBadge.style.display = 'flex';
-      if (rateLimitToast) rateLimitToast.classList.add('visible');
-      
-      // Auto-hide toast after 5 seconds (badge stays until resolved)
-      setTimeout(() => {
-        if (rateLimitToast) rateLimitToast.classList.remove('visible');
-      }, 5000);
+      showToast('Voice busy — please wait a moment');
     }
     
     function hideRateLimitWarning() {
       console.log('Hiding rate limit warning');
       if (rateLimitBadge) rateLimitBadge.style.display = 'none';
-      if (rateLimitToast) rateLimitToast.classList.remove('visible');
+      hideToast();
     }
     
     // Single TTS connection attempt (internal)
@@ -1114,6 +1144,15 @@
             session_id: sessionId
           })
         });
+        
+        if (response.status === 429) {
+          console.warn('Voice chat rate limited');
+          showToast('Too many voice requests — please wait a moment', 6000);
+          closeTTS();
+          voiceState = 'listening';
+          updateWaveformState('listening');
+          return;
+        }
         
         if (!response.ok) {
           throw new Error('Failed to get response');

@@ -3,11 +3,12 @@ Chat API routes.
 Handles text-based chat endpoints.
 """
 import uuid
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
 
 from config import logger
 from flows.chat import ChatFlow
+from services.rate_limit import RateLimiter
 
 router = APIRouter(tags=["chat"])
 
@@ -21,9 +22,14 @@ async def create_session():
 
 
 @router.post("/chat")
-async def chat(request: Request):
+async def chat(
+    request: Request,
+    _rate_limit=Depends(RateLimiter(requests=20, window=60, endpoint="chat")),
+):
     """
     Process a chat message and stream the response.
+    
+    Rate limited to 20 requests/minute per IP.
     
     Request body:
         - message: str - The user's message

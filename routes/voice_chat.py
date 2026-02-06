@@ -6,7 +6,7 @@ import json
 import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import httpx
@@ -14,6 +14,7 @@ import httpx
 from config import logger, jinja_env, OPENAI_API_KEY
 from services.retrieval import retrieve_context
 from services.session import get_session_history, save_session_message, format_chat_history
+from services.rate_limit import RateLimiter
 
 router = APIRouter(tags=["voice"])
 
@@ -24,9 +25,14 @@ class VoiceChatRequest(BaseModel):
 
 
 @router.post("/voice/chat")
-async def voice_chat(request: VoiceChatRequest):
+async def voice_chat(
+    request: VoiceChatRequest,
+    _rate_limit=Depends(RateLimiter(requests=20, window=60, endpoint="voice-chat")),
+):
     """
     Process voice transcript and stream LLM response.
+    
+    Rate limited to 20 requests/minute per IP.
     
     This endpoint is designed for voice - it:
     - Uses the voice_prompt.j2 template (short, conversational responses)
