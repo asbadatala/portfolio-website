@@ -1,170 +1,156 @@
-# Ankit's Portfolio — AI Assistant (RAG + Voice AI)
+# AI-Powered Portfolio with Chatbot + Voice Assistant
+Learn about me through natural conversation, not skimming a PDF.
 
-Live site: **[https://ankitsdesk.vercel.app/](https://ankitsdesk.vercel.app/)**
+**Live:** [ankitsdesk.vercel.app](https://ankitsdesk.vercel.app/)
 
-This repo contains the code for Ankit Badatala's portfolio site with a **streaming RAG chat assistant** and **real-time Voice AI** that answers questions using only the portfolio knowledge base.
+A portfolio website with two AI interfaces: a **streaming RAG chatbot** and a **real-time voice assistant** with sub second latency. Both can answer questions about my experience using only a personally curated knowledge base to avoid hallucinations.
 
-## What this project demonstrates
+## Tech Stack
 
-- **Production-style RAG**: Upstash Vector search over curated portfolio documents
-- **Strict grounding**: The assistant answers from retrieved context only
-- **Streaming UX**: Server-Sent Events (SSE) to stream tokens to the UI
-- **Session memory**: Redis-backed chat history (Upstash Redis) shared between chat and voice
-- **Real-time Voice AI**: Streaming speech-to-text and text-to-speech via Deepgram
-- **Live audio waveform**: Real-time visualization of both user speech and AI responses
-- **Deployment on Vercel**: API runs as Python serverless functions
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI, deployed as Vercel serverless functions |
+| LLM | OpenAI GPT-4o-mini (streaming completions) |
+| Embeddings | OpenAI `text-embedding-3-small` (1536 dims) |
+| Vector DB | Upstash Vector via LangChain |
+| Sessions | Upstash Redis (shared between chat and voice) |
+| Voice STT | Deepgram Flux (WebSocket, client-side) |
+| Voice TTS | Deepgram Aura (WebSocket, client-side) |
+| Frontend | Vanilla HTML/CSS/JS, Web Audio API, AnalyserNode |
 
-## Tech stack
+## Architecture
 
-- **Backend**: FastAPI + Uvicorn
-- **LLM**: OpenAI Chat Completions (streaming)
-- **Embeddings + Vector DB**: OpenAI embeddings + Upstash Vector (via LangChain)
-- **Sessions**: Upstash Redis
-- **Voice AI**: Deepgram Flux (STT) + Deepgram Aura (TTS)
-- **Frontend**: Static HTML/CSS/JS with Web Audio API
+```
+Browser                          Vercel (Serverless)              External APIs
+┌──────────────────┐             ┌──────────────────┐             ┌─────────────────┐
+│                  │   POST      │                  │   Embed +   │                 │
+│  Chat UI ────────┼────────────>│  /api/chat       │───Query────>│  Upstash Vector │
+│  (SSE stream)    │<────────────│  (RAG + LLM)     │             │                 │
+│                  │   SSE       │                  │   Stream    │  OpenAI GPT-4o  │
+│                  │             │                  │────────────>│  (completions)  │
+├──────────────────┤             ├──────────────────┤             ├─────────────────┤
+│                  │   GET       │                  │   Mint key  │                 │
+│  Voice UI ───────┼────────────>│  /api/token      │────────────>│  Deepgram API   │
+│  (Web Audio API) │<────────────│  (30s TTL key)   │             │  (key creation) │
+│                  │             ├──────────────────┤             ├─────────────────┤
+│       ┌──────────┤   WSS      │                  │             │                 │
+│       │ Mic ─────┼────────────┼──────────────────┼────────────>│  Deepgram Flux  │
+│       │          │<───────────┼──────────────────┼─────────────│  (STT)          │
+│       └──────────┤  transcript│                  │             ├─────────────────┤
+│       ┌──────────┤   POST     │                  │             │                 │
+│       │ Speaker──┼────────────┤  /api/voice/chat │────────────>│  OpenAI GPT-4o  │
+│       │          │<───────────┤  (RAG + LLM)     │   Stream    │  (completions)  │
+│       └──────────┤   WSS      │                  │             ├─────────────────┤
+│       ┌──────────┼────────────┼──────────────────┼────────────>│  Deepgram Aura  │
+│       │ Audio out│<───────────┼──────────────────┼─────────────│  (TTS)          │
+│       └──────────┤            │                  │             │                 │
+│  Waveform visual │            │  Rate Limiter    │             │  Upstash Redis  │
+│  (AnalyserNode)  │            │  (per-IP, Redis) │<───────────>│  (sessions +    │
+│                  │            │                  │             │   rate limits)  │
+└──────────────────┘             └──────────────────┘             └─────────────────┘
+```
 
-## Features
+**Key constraint**: Vercel serverless functions don't support WebSockets. The browser connects directly to Deepgram's WebSocket APIs using short-lived keys minted by the server. Vercel only handles stateless HTTP (token minting, LLM streaming).
 
-### Chat Assistant
-- RAG-powered responses grounded in portfolio documents
-- Streaming responses with typing effect
-- Session-based conversation history
+## Engineering Decisions
 
-### Voice AI
-- **Speech-to-Text**: Deepgram Flux with turn detection for natural conversation flow
-- **Text-to-Speech**: Deepgram Aura with streaming audio playback
-- **Interruption support**: Stop the AI mid-sentence by speaking
-- **Real waveform visualization**: Audio analyzer shows actual voice patterns (not simulated)
-- **Client-side architecture**: Browser connects directly to Deepgram WebSockets (Vercel-compatible)
+### RAG: Chunking for Accuracy
 
-## Repo layout (website/)
+Documents are split at `#` and `##` header boundaries only (not `###`), keeping entire project descriptions in single chunks. This prevents the LLM from conflating details across projects — e.g., attributing one project's team size to another.
+
+### Voice: Client-Side WebSocket Architecture
+
+Since Vercel can't hold WebSocket connections, the browser owns the Deepgram connections directly. The server's only role is minting a 30-second ephemeral API key per call. This keeps the architecture serverless-compatible while maintaining low-latency audio streaming.
+
+### Security: Defense in Depth
+
+| Protection | Implementation |
+|---|---|
+| API key exposure | Server mints 30s TTL Deepgram keys; real key never reaches the browser |
+| Abuse prevention | Redis-backed per-IP rate limiting (token: 5/min, chat: 20/min, voice: 20/min) |
+| Cross-origin | CORS locked to production domain (`ankitsdesk.vercel.app`) |
+| Vercel proxy | IP extraction reads `x-real-ip` so rate limits apply to the real client, not Vercel's internal proxy |
+| Fail-open | If Redis is unavailable, rate limiter degrades gracefully (allows requests) |
+
+### Voice: Interruption and State Management
+
+Users can interrupt the AI mid-sentence. When speech is detected during playback, the audio queue is flushed, TTS is stopped, and the new transcript is processed immediately. A waveform visualizer driven by `AnalyserNode` reflects the actual pipeline state (listening, processing, speaking) with a 15-second safety timeout to recover from stuck states.
+
+## API Endpoints
+
+All endpoints are rate-limited per IP via Upstash Redis.
+
+| Endpoint | Method | Description | Rate Limit |
+|---|---|---|---|
+| `/api/session` | POST | Create a new chat session | -- |
+| `/api/chat` | POST | Stream a RAG-augmented LLM response (SSE) | 20/min |
+| `/api/deepgram-token` | GET | Mint a short-lived Deepgram key (30s TTL) | 5/min |
+| `/api/voice/chat` | POST | Stream LLM response for voice (plain text) | 20/min |
+| `/api/health` | GET | Health check | -- |
+
+## Project Structure
 
 ```
 website/
-├── api/
-│   └── index.py              # Vercel serverless function entry (FastAPI)
-├── public/                   # Static site (served by Vercel)
-│   ├── index.html            # Main portfolio page
-│   ├── blogs.html            # Blog listing page
-│   ├── blog/                 # Individual blog posts
-│   │   └── building-voice-ai.html
-│   ├── styles.css            # Global styles
-│   ├── components/           # Reusable JS components
-│   │   ├── social-links.js   # GitHub, LinkedIn, Spotify icons
-│   │   └── back-button.js    # Navigation back button
-│   └── objects/              # Images/videos
-├── config.py                 # Env + shared clients (LLM, vector store, Redis)
+├── api/index.py                 # Vercel serverless entry point
+├── server.py                    # Local dev server (static files + API)
+├── config.py                    # Environment, clients, shared state
 ├── routes/
-│   ├── chat.py               # Chat API endpoint
-│   ├── token.py              # Deepgram token endpoint
-│   └── voice_chat.py         # Voice LLM processing endpoint
+│   ├── chat.py                  # POST /api/chat — streaming RAG chat
+│   ├── voice_chat.py            # POST /api/voice/chat — voice LLM
+│   └── token.py                 # GET /api/deepgram-token — ephemeral keys
 ├── flows/
-│   └── chat.py               # Chat orchestration
+│   └── chat.py                  # Chat orchestration (retrieval + LLM + session)
 ├── services/
-│   ├── retrieval.py          # Vector search
-│   ├── session.py            # Redis session management
-│   └── llm.py                # LLM streaming
+│   ├── retrieval.py             # Upstash Vector similarity search
+│   ├── session.py               # Redis session read/write
+│   ├── rate_limit.py            # Per-IP rate limiter (Redis-backed)
+│   └── llm.py                   # OpenAI streaming wrapper
 ├── prompts/
-│   ├── speaker_prompt.j2     # Chat system prompt
-│   └── voice_prompt.j2       # Voice system prompt (conversational, first-person)
+│   ├── speaker_prompt.j2        # Chat system prompt (Jinja2)
+│   └── voice_prompt.j2          # Voice system prompt (concise, first-person)
+├── public/                      # Static frontend
+│   ├── index.html               # Main page (chat + voice UI)
+│   ├── projects.html            # Projects showcase
+│   ├── blogs.html               # Blog listing
+│   ├── blog/                    # Blog posts
+│   ├── styles.css               # Global styles
+│   └── components/              # Reusable JS (social links, back button)
+├── data_ingestion/
+│   ├── build_embeddings_upstash.py  # Markdown chunking + embedding pipeline
+│   └── documents/               # Source markdown files
 ├── requirements.txt
-├── vercel.json
-└── server.py                 # Local dev server (serves `public/` + API)
+└── vercel.json
 ```
 
-## Frontend Components
-
-Reusable JavaScript components are in `public/components/`:
-
-### social-links.js
-Social media icons (GitHub, LinkedIn, Spotify). Edit this single file to update links across all pages.
-
-```html
-<!-- Usage: Add to any page -->
-<div class="social-links" id="social-links"></div>
-<script src="/components/social-links.js"></script>
-```
-
-### back-button.js
-Navigation back button with configurable destination.
-
-```html
-<!-- Usage: Set data-href for destination -->
-<a class="back-button" id="back-button" data-href="/" data-label="Back to Home"></a>
-<script src="/components/back-button.js"></script>
-```
-
-## Local development
-
-From the repo root:
+## Setup
 
 ```bash
 cd website
 pip install -r requirements.txt
 python server.py
+# → http://localhost:3001
 ```
 
-Then open:
-- **Frontend**: `http://localhost:3001/`
-- **Health**: `http://localhost:3001/api/health`
-
-> **Note**: Use `localhost` (not `127.0.0.1`) for microphone access in Chrome.
-
-## Environment variables
+### Environment Variables
 
 Create `website/.env`:
 
 ```env
-# OpenAI
 OPENAI_API_KEY=...
-
-# Upstash Vector
 UPSTASH_VECTOR_REST_URL=...
 UPSTASH_VECTOR_REST_TOKEN=...
 UPSTASH_NAMESPACE=portfolio_rag_v2
-
-# Upstash Redis (enables session history)
 UPSTASH_REDIS_REST_URL=...
 UPSTASH_REDIS_REST_TOKEN=...
-
-# Deepgram (for Voice AI)
-DEEPGRAM_API_KEY=...
-DEEPGRAM_PROJECT_ID=...
-
-# Security (optional — defaults to production domain)
-# ALLOWED_ORIGINS=https://ankitsdesk.vercel.app
+DEEPGRAM_API_KEY=...              # Admin role required (keys:write scope)
+DEEPGRAM_PROJECT_ID=...           # Deepgram Console → Settings → Project
+# ALLOWED_ORIGINS=https://ankitsdesk.vercel.app  # Defaults to production domain
 ```
 
-## API
+> The Deepgram API key needs the `keys:write` scope to mint temporary keys. See [Deepgram roles documentation](https://developers.deepgram.com/guides/deep-dives/working-with-roles).
 
-All endpoints are rate-limited per IP using Upstash Redis.
-
-- **`POST /api/session`**: Returns a session ID
-- **`POST /api/chat`**: Streams an SSE response (`text/event-stream`) — 20 req/min
-- **`GET /api/deepgram-token`**: Mints a short-lived Deepgram key (30s TTL) — 5 req/min
-- **`POST /api/voice/chat`**: Streams LLM response for voice (plain text) — 20 req/min
-- **`GET /api/health`**: Health check
-
-## How it works
-
-### Chat Flow
-1. User sends a message
-2. Backend retrieves **top-k relevant chunks** from Upstash Vector
-3. LLM generates a response using retrieved context + chat history
-4. Response is **streamed to the browser** over SSE
-
-### Voice Flow
-1. Browser captures microphone audio and streams to Deepgram Flux (STT)
-2. Deepgram detects end-of-turn and returns transcript
-3. Browser sends transcript to `/api/voice/chat` for LLM processing
-4. LLM response streams back and is sent to Deepgram Aura (TTS)
-5. Audio chunks are played with real-time waveform visualization
-
-## Architecture Notes
-
-- **Vercel-compatible**: Since Vercel serverless functions don't support WebSockets, the browser connects directly to Deepgram's WebSocket APIs. Vercel only handles short-lived HTTP requests (token minting, LLM calls).
-- **Rate limit handling**: Built-in retry logic with exponential backoff for Deepgram API limits.
-- **Shared session**: Chat and voice use the same Redis session, so context is preserved across modalities.
+> Use `localhost` (not `127.0.0.1`) for microphone access in Chrome.
 
 ## Author
 
