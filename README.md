@@ -1,9 +1,11 @@
 # AI-Powered Portfolio with Chatbot + Voice Assistant
+A portfolio website with two AI interfaces: a **streaming RAG chatbot** and a **real-time voice assistant** with sub second latency. Both can answer questions about my experience using only a personally curated knowledge base to avoid hallucinations.
+
 Learn about me through natural conversation, not skimming a PDF.
 
 **Live:** [ankitsdesk.vercel.app](https://ankitsdesk.vercel.app/)
+Demo (2/6/2026):
 
-A portfolio website with two AI interfaces: a **streaming RAG chatbot** and a **real-time voice assistant** with sub second latency. Both can answer questions about my experience using only a personally curated knowledge base to avoid hallucinations.
 
 ## Tech Stack
 
