@@ -101,8 +101,26 @@
         <div class="waveform-bar"></div>
         <div class="waveform-bar"></div>
       </div>
+      <!-- Mute button - appears next to waveform during call -->
+      <button class="voice-control-btn mute-btn" id="mute-btn" aria-label="Mute microphone">
+        <!-- Mic on icon (unmuted state) -->
+        <svg class="mic-on-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <!-- Mic off icon (muted state) -->
+        <svg class="mic-off-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none">
+          <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2c0 .76-.12 1.49-.34 2.18" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="12" y1="19" x2="12" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="8" y1="23" x2="16" y2="23" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <!-- End call button - appears next to waveform during call -->
-      <button class="end-call-btn" id="end-call-btn" aria-label="End Call">
+      <button class="voice-control-btn end-call-btn" id="end-call-btn" aria-label="End Call">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -204,6 +222,7 @@
     
     // Call state
     let isInCall = false;
+    let isMuted = false;
     
     // Chat streaming state
     let isStreaming = false;
@@ -608,6 +627,22 @@
     function updateWaveformState(state) {
       voiceWaveform.classList.remove('idle', 'speaking', 'user-talking', 'processing');
       
+      // If muted and the new state is 'listening', keep muted visual but track internal state
+      if (isMuted && state === 'listening') {
+        // Re-apply muted class (may have been removed during processing/speaking)
+        voiceWaveform.classList.add('muted');
+        // Muted visual overrides listening — stop any running animation
+        stopWaveformAnimation();
+        stopSpeakingSimulation();
+        return;
+      }
+      
+      // For non-listening states (processing, speaking), show them even when muted
+      // because the AI is still responding. Remove muted visual temporarily.
+      if (isMuted && (state === 'processing' || state === 'speaking')) {
+        voiceWaveform.classList.remove('muted');
+      }
+      
       switch (state) {
         case 'listening':
           voiceWaveform.classList.add('user-talking');
@@ -625,6 +660,31 @@
         default:
           voiceWaveform.classList.add('idle');
           stopWaveformAnimation();
+      }
+    }
+    
+    // Toggle mute state
+    function toggleMute() {
+      isMuted = !isMuted;
+      muteBtn.classList.toggle('muted', isMuted);
+      micOnIcon.style.display = isMuted ? 'none' : 'block';
+      micOffIcon.style.display = isMuted ? 'block' : 'none';
+      
+      if (isMuted) {
+        // Only show muted waveform visual when in listening/idle state.
+        // During processing/speaking, let the AI animation play normally —
+        // muted visual will kick in when state transitions back to listening.
+        if (voiceState === 'listening' || voiceState === 'idle') {
+          voiceWaveform.classList.add('muted');
+          stopWaveformAnimation();
+          stopSpeakingSimulation();
+        }
+        console.log('Microphone muted');
+      } else {
+        voiceWaveform.classList.remove('muted');
+        // Restore the current voice state's waveform visual
+        updateWaveformState(voiceState);
+        console.log('Microphone unmuted');
       }
     }
     
@@ -1453,6 +1513,9 @@
         
         let audioFrameCount = 0;
         micProcessor.onaudioprocess = (event) => {
+          // Don't send audio when muted
+          if (isMuted) return;
+          
           // Send to Deepgram STT directly
           if (sttSocket && sttSocket.readyState === WebSocket.OPEN) {
             const inputData = event.inputBuffer.getChannelData(0);
@@ -1670,6 +1733,14 @@
       hideWaveform();
       voiceState = 'idle';
       audioInterrupted = false;
+      // Reset mute state
+      if (isMuted) {
+        isMuted = false;
+        muteBtn.classList.remove('muted');
+        micOnIcon.style.display = 'block';
+        micOffIcon.style.display = 'none';
+        voiceWaveform.classList.remove('muted');
+      }
       // Clear any pending processing timeout
       if (processingTimeout) {
         clearTimeout(processingTimeout);
@@ -1678,8 +1749,11 @@
       console.log('Voice call ended');
     }
 
-    // End call button (next to waveform)
+    // Voice control buttons (next to waveform)
     const endCallBtn = document.getElementById('end-call-btn');
+    const muteBtn = document.getElementById('mute-btn');
+    const micOnIcon = muteBtn.querySelector('.mic-on-icon');
+    const micOffIcon = muteBtn.querySelector('.mic-off-icon');
 
     // Helper to hide all nav icons
     function hideAllNavIcons() {
@@ -1722,6 +1796,12 @@
         hideAllOverlays();
         alert(error.message || 'Failed to start voice call. Please check microphone permissions.');
       }
+    });
+
+    // Mute button
+    muteBtn.addEventListener('click', () => {
+      if (!isInCall) return;
+      toggleMute();
     });
 
     // End call button (next to waveform) - ends call
