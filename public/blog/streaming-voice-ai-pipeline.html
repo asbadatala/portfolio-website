@@ -46,19 +46,20 @@
       <h2>Architecture Overview</h2>
       <p>Here's what I ended up with:</p>
 
-      <pre><code>┌─────────────────────────────────────────────────────────────────┐
-│                         BROWSER                                  │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
-│  │   Mic       │───▶│  STT WS     │───▶│  Transcript │         │
-│  │   Capture   │    │  (Deepgram) │    │             │         │
-│  └─────────────┘    └─────────────┘    └──────┬──────┘         │
-│                                                │                 │
-│                                                ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
-│  │   Speaker   │◀───│  TTS WS     │◀───│  LLM Call   │◀────────│
-│  │   Playback  │    │  (Deepgram) │    │  (Vercel)   │         │
-│  └─────────────┘    └─────────────┘    └─────────────┘         │
-└─────────────────────────────────────────────────────────────────┘</code></pre>
+      <pre><code>┌──────────────────────────────────────────────────────────────┐
+│                          BROWSER                             │
+│                                                              │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐         │
+│  │ Mic Capture │──▶│ STT WS      │──▶│ Transcript  │         │
+│  │             │   │ (Deepgram)  │   │             │         │
+│  └─────────────┘   └─────────────┘   └──────┬──────┘         │
+│                                             │                │
+│                                             ▼                │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐         │
+│  │ Speaker     │◀──│ TTS WS      │◀──│ LLM Call    │◀────────│
+│  │ Playback    │   │ (Deepgram)  │   │ (Vercel)    │         │
+│  └─────────────┘   └─────────────┘   └─────────────┘         │
+└──────────────────────────────────────────────────────────────┘</code></pre>
 
       <p>The key insight: <strong>the browser is the orchestrator</strong>. It connects directly to Deepgram's WebSocket APIs for both speech-to-text (Flux) and text-to-speech (Aura). Vercel only handles two short-lived HTTP requests:</p>
       <ol>
