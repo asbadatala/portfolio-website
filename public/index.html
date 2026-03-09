@@ -533,6 +533,29 @@
     
     // Voice state
     let deepgramToken = null;
+    let tokenRefreshTimer = null;
+    
+    function scheduleTokenRefresh() {
+      if (tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = setTimeout(async () => {
+        if (!isInCall) return;
+        try {
+          console.log('Refreshing Deepgram token...');
+          deepgramToken = await getDeepgramToken();
+          console.log('Token refreshed successfully');
+          scheduleTokenRefresh();
+        } catch (e) {
+          console.error('Token refresh failed:', e);
+        }
+      }, 50000);
+    }
+    
+    function cancelTokenRefresh() {
+      if (tokenRefreshTimer) {
+        clearTimeout(tokenRefreshTimer);
+        tokenRefreshTimer = null;
+      }
+    }
     let sttSocket = null;  // Deepgram Flux STT WebSocket
     let ttsSocket = null;  // Deepgram Aura TTS WebSocket
     let audioContext = null;
@@ -1693,6 +1716,7 @@
         // Get Deepgram token first
         console.log('Getting Deepgram token...');
         deepgramToken = await getDeepgramToken();
+        scheduleTokenRefresh();
         console.log('Token received');
         
         // Request microphone permission
@@ -1713,6 +1737,7 @@
         console.error('Failed to start voice call:', error);
         
         // Cleanup on failure
+        cancelTokenRefresh();
         stopRecording();
         disconnectVoice();
         
@@ -1727,6 +1752,7 @@
     
     // End voice call
     function endVoiceCall() {
+      cancelTokenRefresh();
       stopRecording();
       stopAudioPlayback();
       disconnectVoice();

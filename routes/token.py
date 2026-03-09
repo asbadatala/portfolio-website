@@ -19,8 +19,8 @@ async def get_deepgram_token(
     Mint a short-lived Deepgram API key for client-side WebSocket connections.
     
     Instead of exposing the real API key, this calls Deepgram's key creation API
-    to generate a temporary key that auto-expires after 30 seconds — enough for
-    the WebSocket handshake but useless if captured by an attacker.
+    to generate a temporary key that auto-expires after 60 seconds. The client
+    refreshes the token at ~50s to ensure seamless multi-turn conversations.
     
     Rate limited to 5 requests/minute per IP.
     
@@ -46,7 +46,7 @@ async def get_deepgram_token(
                 json={
                     "comment": "short-lived-browser",
                     "scopes": ["usage:write"],
-                    "time_to_live_in_seconds": 30,
+                    "time_to_live_in_seconds": 60,
                 },
                 timeout=10.0,
             )
@@ -70,7 +70,7 @@ async def get_deepgram_token(
                 detail="Invalid response from Deepgram",
             )
         
-        logger.info("Minted short-lived Deepgram key (30s TTL)")
+        logger.info("Minted short-lived Deepgram key (60s TTL)")
         return {"key": temp_key}
     
     except httpx.RequestError as e:
