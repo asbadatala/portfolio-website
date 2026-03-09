@@ -8,7 +8,8 @@ from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores.upstash import UpstashVectorStore
-from upstash_redis import Redis
+from upstash_redis import Redis as SyncRedis
+from upstash_redis.asyncio import Redis as AsyncRedis
 
 # Load environment variables
 load_dotenv()
@@ -60,8 +61,13 @@ vector_store = UpstashVectorStore(
 # --------------------------
 redis_client = None
 if UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN:
-    redis_client = Redis(url=UPSTASH_REDIS_URL, token=UPSTASH_REDIS_TOKEN)
-    logger.info("Redis client initialized for session history")
+    try:
+        _health_check = SyncRedis(url=UPSTASH_REDIS_URL, token=UPSTASH_REDIS_TOKEN)
+        _health_check.ping()
+        redis_client = AsyncRedis(url=UPSTASH_REDIS_URL, token=UPSTASH_REDIS_TOKEN)
+        logger.info("Redis client initialized for session history")
+    except Exception as e:
+        logger.warning(f"Redis unavailable at startup - session history disabled: {e}")
 else:
     logger.warning("Redis credentials not found - session history disabled")
 

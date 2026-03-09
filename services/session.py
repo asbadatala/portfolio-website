@@ -22,7 +22,7 @@ async def get_session_history(session_id: str) -> list:
     
     try:
         key = f"{SESSION_HISTORY_KEY_PREFIX}{session_id}"
-        history_json = redis_client.get(key)
+        history_json = await redis_client.get(key)
         if history_json:
             return json.loads(history_json)
         return []
@@ -53,7 +53,7 @@ async def save_session_message(session_id: str, role: str, content: str):
             history = history[-MAX_HISTORY_MESSAGES:]
         
         # Save back to Redis with TTL
-        redis_client.setex(key, SESSION_TTL_SECONDS, json.dumps(history))
+        await redis_client.setex(key, SESSION_TTL_SECONDS, json.dumps(history))
         logger.info(f"Redis: Saved message to session {session_id}, total messages: {len(history)}")
     except Exception as e:
         logger.error(f"Error saving session message: {e}")

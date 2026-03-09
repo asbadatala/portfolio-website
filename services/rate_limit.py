@@ -67,15 +67,15 @@ class RateLimiter:
         key = f"rl:{self.endpoint}:{ip}"
         
         try:
-            count = redis_client.incr(key)
+            count = await redis_client.incr(key)
             
             # Set expiry on first request in window
             if count == 1:
-                redis_client.expire(key, self.window)
+                await redis_client.expire(key, self.window)
             
             if count > self.requests:
                 # Get TTL so client knows when to retry
-                ttl = redis_client.ttl(key)
+                ttl = await redis_client.ttl(key)
                 logger.warning(
                     f"Rate limit exceeded for {ip} on {self.endpoint}: "
                     f"{count}/{self.requests} (resets in {ttl}s)"

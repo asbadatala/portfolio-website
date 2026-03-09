@@ -28,7 +28,7 @@ async def keep_alive(request: Request):
         return {"status": "skipped", "reason": "redis_client is None"}
 
     try:
-        redis_client.ping()
+        await redis_client.ping()
         logger.info("Keep-alive: Redis ping successful")
         return {"status": "ok"}
     except Exception as e:
