@@ -1,5 +1,5 @@
 # AI-Powered Portfolio with Chatbot + Voice Assistant
-A portfolio website with two AI interfaces: a **streaming RAG chatbot** and a **real-time voice assistant** with sub second latency. Both can answer questions about my experience using only a personally curated knowledge base to avoid hallucinations.
+A portfolio website with two AI interfaces: a **streaming RAG chatbot** and a **real-time voice assistant** with ultra low latency. Both can answer questions about my experience using only a personally curated knowledge base to avoid hallucinations.
 
 Learn about me through natural conversation, not skimming a PDF.
 
@@ -33,22 +33,22 @@ Browser                          Vercel (Serverless)              External APIs
 ├──────────────────┤             ├──────────────────┤             ├─────────────────┤
 │                  │   GET       │                  │   Mint key  │                 │
 │  Voice UI ───────┼────────────>│  /api/token      │────────────>│  Deepgram API   │
-│  (Web Audio API) │<────────────│  (30s TTL key)   │             │  (key creation) │
+│  (Web Audio API) │<────────────│  (60s TTL key)   │             │  (key creation) │
 │                  │             ├──────────────────┤             ├─────────────────┤
-│       ┌──────────┤   WSS      │                  │             │                 │
-│       │ Mic ─────┼────────────┼──────────────────┼────────────>│  Deepgram Flux  │
-│       │          │<───────────┼──────────────────┼─────────────│  (STT)          │
-│       └──────────┤  transcript│                  │             ├─────────────────┤
-│       ┌──────────┤   POST     │                  │             │                 │
-│       │ Speaker──┼────────────┤  /api/voice/chat │────────────>│  OpenAI GPT-4o  │
-│       │          │<───────────┤  (RAG + LLM)     │   Stream    │  (completions)  │
-│       └──────────┤   WSS      │                  │             ├─────────────────┤
-│       ┌──────────┼────────────┼──────────────────┼────────────>│  Deepgram Aura  │
-│       │ Audio out│<───────────┼──────────────────┼─────────────│  (TTS)          │
-│       └──────────┤            │                  │             │                 │
-│  Waveform visual │            │  Rate Limiter    │             │  Upstash Redis  │
-│  (AnalyserNode)  │            │  (per-IP, Redis) │<───────────>│  (sessions +    │
-│                  │            │                  │             │   rate limits)  │
+│       ┌──────────┤   WSS       │                  │             │                 │
+│       │ Mic ─────┼─────────────┼──────────────────┼────────────>│  Deepgram Flux  │
+│       │          │<────────────┼──────────────────┼─────────────│  (STT)          │
+│       └──────────┤  transcript │                  │             ├─────────────────┤
+│       ┌──────────┤   POST      │                  │             │                 │
+│       │ Speaker──┼─────────────┤  /api/voice/chat │────────────>│  OpenAI GPT-4o  │
+│       │          │<────────────┤  (RAG + LLM)     │   Stream    │  (completions)  │
+│       └──────────┤   WSS       │                  │             ├─────────────────┤
+│       ┌──────────┼─────────────┼──────────────────┼────────────>│  Deepgram Aura  │
+│       │ Audio out│<────────────┼──────────────────┼─────────────│  (TTS)          │
+│       └──────────┤             │                  │             │                 │
+│  Waveform visual │             │  Rate Limiter    │             │  Upstash Redis  │
+│  (AnalyserNode)  │             │  (per-IP, Redis) │<───────────>│  (sessions +    │
+│                  │             │                  │             │   rate limits)  │
 └──────────────────┘             └──────────────────┘             └─────────────────┘
 ```
 
@@ -62,13 +62,13 @@ Documents are split at `#` and `##` header boundaries only (not `###`), keeping 
 
 ### Voice: Client-Side WebSocket Architecture
 
-Since Vercel can't hold WebSocket connections, the browser owns the Deepgram connections directly. The server's only role is minting a 30-second ephemeral API key per call. This keeps the architecture serverless-compatible while maintaining low-latency audio streaming.
+Since Vercel can't hold WebSocket connections, the browser owns the Deepgram connections directly. The server mints 60-second ephemeral Deepgram keys, and the client refreshes them every ~50 seconds during an active call so new TTS connections never hit an expired token. This keeps the architecture serverless-compatible while maintaining low-latency audio streaming.
 
 ### Security: Defense in Depth
 
 | Protection | Implementation |
 |---|---|
-| API key exposure | Server mints 30s TTL Deepgram keys; real key never reaches the browser |
+| API key exposure | Server mints 60s TTL Deepgram keys and the client refreshes them during active calls; the real key never reaches the browser |
 | Abuse prevention | Redis-backed per-IP rate limiting (token: 5/min, chat: 20/min, voice: 20/min) |
 | Cross-origin | CORS locked to production domain (`ankitsdesk.vercel.app`) |
 | Vercel proxy | IP extraction reads `x-real-ip` so rate limits apply to the real client, not Vercel's internal proxy |
@@ -86,7 +86,7 @@ All endpoints are rate-limited per IP via Upstash Redis.
 |---|---|---|---|
 | `/api/session` | POST | Create a new chat session | -- |
 | `/api/chat` | POST | Stream a RAG-augmented LLM response (SSE) | 20/min |
-| `/api/deepgram-token` | GET | Mint a short-lived Deepgram key (30s TTL) | 5/min |
+| `/api/deepgram-token` | GET | Mint a short-lived Deepgram key (60s TTL) | 5/min |
 | `/api/voice/chat` | POST | Stream LLM response for voice (plain text) | 20/min |
 | `/api/health` | GET | Health check | -- |
 
