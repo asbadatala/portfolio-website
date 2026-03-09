@@ -125,35 +125,6 @@ website/
 └── vercel.json
 ```
 
-## Setup
-
-```bash
-cd website
-pip install -r requirements.txt
-python server.py
-# → http://localhost:3001
-```
-
-### Environment Variables
-
-Create `website/.env`:
-
-```env
-OPENAI_API_KEY=...
-UPSTASH_VECTOR_REST_URL=...
-UPSTASH_VECTOR_REST_TOKEN=...
-UPSTASH_NAMESPACE=portfolio_rag_v2
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
-DEEPGRAM_API_KEY=...              # Admin role required (keys:write scope)
-DEEPGRAM_PROJECT_ID=...           # Deepgram Console → Settings → Project
-# ALLOWED_ORIGINS=https://ankitsdesk.vercel.app  # Defaults to production domain
-```
-
-> The Deepgram API key needs the `keys:write` scope to mint temporary keys. See [Deepgram roles documentation](https://developers.deepgram.com/guides/deep-dives/working-with-roles).
-
-> Use `localhost` (not `127.0.0.1`) for microphone access in Chrome.
-
 ## Author
 
 Ankit Badatala
