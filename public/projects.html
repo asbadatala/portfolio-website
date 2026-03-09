@@ -61,6 +61,20 @@
         </div>
       </div>
 
+      <!-- Building a Mobile App - Coming Soon -->
+      <div class="carousel-card" data-index="1">
+        <div class="card-image">
+          <div class="card-image-placeholder">
+            <svg width="80" height="120" viewBox="0 0 24 36" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="4" y="2" width="16" height="32" rx="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="12" y1="28" x2="12" y2="30" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <h3 class="card-title">Building a Mobile App</h3>
+        <p class="card-description">Coming soon</p>
+      </div>
+
     </div>
 
   </div>
@@ -82,14 +96,42 @@
   </div>
 
   <script>
-    // Single project - just ensure it's marked as active
+    // Carousel state for toggling between visible cards
     const carousel = document.getElementById('carousel');
     const cards = carousel.querySelectorAll('.carousel-card');
-    
-    // Mark the single card as active
-    if (cards.length > 0) {
-      cards[0].classList.add('active');
+    let activeIndex = 0;
+
+    function updateCarousel() {
+      cards.forEach((card, i) => {
+        card.classList.remove('active', 'prev', 'next', 'far-prev', 'far-next');
+        if (i === activeIndex) {
+          card.classList.add('active');
+        } else if (i === activeIndex - 1) {
+          card.classList.add('prev');
+        } else if (i === activeIndex + 1) {
+          card.classList.add('next');
+        } else if (i < activeIndex - 1) {
+          card.classList.add('far-prev');
+        } else {
+          card.classList.add('far-next');
+        }
+      });
     }
+
+    updateCarousel();
+
+    // Click the side card to bring it into focus
+    cards.forEach((card, i) => {
+      card.addEventListener('click', () => {
+        if (card.classList.contains('prev')) {
+          activeIndex = i;
+          updateCarousel();
+        } else if (card.classList.contains('next')) {
+          activeIndex = i;
+          updateCarousel();
+        }
+      });
+    });
 
     // Video Modal Functionality
     const demoVideoBtn = document.getElementById('demo-video-btn');
