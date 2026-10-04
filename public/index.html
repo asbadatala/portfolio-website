@@ -8,7 +8,8 @@
   
   <!-- Preload critical assets for faster rendering -->
   <link rel="preload" href="/objects/marble-floor.webp" as="image" />
-  <link rel="preload" href="/objects/videos/marble-typing-astra.mp4" as="video" type="video/mp4" />
+  <link rel="preload" href="/objects/videos/marble-typing-astra.mp4" as="video" type="video/mp4" media="(min-width: 769px)" />
+  <link rel="preload" href="/objects/videos/marble-typing-astra-mobile.mp4" as="video" type="video/mp4" media="(max-width: 768px)" />
 </head>
 <body>
 
@@ -59,7 +60,9 @@
   <div class="frame-container">
     <div class="frame">
       <!-- Background typing video - always playing -->
-      <video class="vid vid-bg" autoplay muted loop playsinline preload="auto">
+      <video class="vid vid-bg" autoplay muted loop playsinline preload="auto" poster="/objects/videos/marble-typing-astra-poster.jpg">
+        <!-- Phones get a 1280px silent encode; the 4K original often won't autoplay on mobile -->
+        <source src="/objects/videos/marble-typing-astra-mobile.mp4" type="video/mp4" media="(max-width: 768px)" />
         <source src="/objects/videos/marble-typing-astra.mp4" type="video/mp4" />
       </video>
       
@@ -200,6 +203,19 @@
     const bgVideo = document.querySelector('.vid-bg');
     const callAnswerVideo = document.getElementById('call-answer-vid');
     const callEndVideo = document.getElementById('call-end-vid');
+
+    // Mobile browsers can block autoplay (e.g. iOS Low Power Mode, Android Data Saver).
+    // Retry play(), and if it's still blocked, start the video on the first tap anywhere.
+    bgVideo.muted = true;
+    bgVideo.play().catch(() => {
+      const startOnGesture = () => {
+        bgVideo.play().catch(() => {});
+        document.removeEventListener('touchstart', startOnGesture);
+        document.removeEventListener('click', startOnGesture);
+      };
+      document.addEventListener('touchstart', startOnGesture, { passive: true });
+      document.addEventListener('click', startOnGesture);
+    });
 
 
     

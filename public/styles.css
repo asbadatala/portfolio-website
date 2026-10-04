@@ -199,6 +199,12 @@
     position: relative;
     z-index: 1;
   }
+
+  /* Hide iOS Safari's big play-button overlay on the decorative videos */
+  .vid::-webkit-media-controls-start-playback-button {
+    display: none !important;
+    -webkit-appearance: none;
+  }
   
   .vid-overlay{
     position: absolute;
