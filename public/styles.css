@@ -597,8 +597,12 @@
     left: 24px;
   }
 
+  /* Center the middle group in the space between the left and right groups (not the
+     screen), so both gaps are equal. Offset = (right group's edge offset + width -
+     left group's edge offset + width) / 2 = ((24 + 132) - (24 + 84)) / 2 = 24px.
+     Recomputed at each breakpoint where icon sizes change. */
   .nav-links-center {
-    left: 50%;
+    left: calc(50% - 24px);
     transform: translateX(-50%);
   }
 
@@ -729,6 +733,13 @@
   }
 
 
+  /* Only the right group has shrunk in this range: ((12 + 112) - (24 + 84)) / 2 */
+  @media (min-width: 601px) and (max-width: 768px) {
+    .nav-links-center {
+      left: calc(50% - 8px);
+    }
+  }
+
   /* Mobile responsive */
   @media (max-width: 600px) {
     .nav-links {
@@ -738,6 +749,11 @@
 
     .nav-links-left {
       left: 12px;
+    }
+
+    /* Both groups shrink: ((12 + 112) - (12 + 72)) / 2 */
+    .nav-links-center {
+      left: calc(50% - 20px);
     }
 
     .nav-icon {
@@ -1085,6 +1101,11 @@
     .social-link {
       width: 30px;
       height: 30px;
+    }
+
+    /* ((12 + 102) - (12 + 66)) / 2 */
+    .nav-links-center {
+      left: calc(50% - 18px);
     }
   }
 
