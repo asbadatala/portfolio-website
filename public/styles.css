@@ -595,12 +595,22 @@
 
   .nav-links-left {
     left: 24px;
+    flex-wrap: wrap;
+    width: 190px;
+  }
+
+  /* Small AI disclaimer under the Chat & Call buttons (desktop only) */
+  .ai-disclaimer {
+    flex-basis: 100%;
+    margin: 0;
+    font: 400 11px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #8b7355;
   }
 
   /* Center the middle group in the space between the left and right groups (not the
      screen), so both gaps are equal. Offset = (right group's edge offset + width -
      left group's edge offset + width) / 2 = ((24 + 132) - (24 + 84)) / 2 = 24px.
-     Recomputed at each breakpoint where icon sizes change. */
+     On phones (<= 768px) the groups stack under the video instead; see the Home mobile block. */
   .nav-links-center {
     left: calc(50% - 24px);
     transform: translateX(-50%);
@@ -651,54 +661,6 @@
     height: 20px;
   }
 
-  /* Sparkle effect for chat and call buttons - star shape */
-  .chat-icon::before,
-  .call-icon::before {
-    content: '';
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 12px;
-    height: 12px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'/%3E%3C/svg%3E");
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
-    animation: sparkle 2s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .chat-icon::after,
-  .call-icon::after {
-    content: '';
-    position: absolute;
-    bottom: -3px;
-    left: -3px;
-    width: 9px;
-    height: 9px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'/%3E%3C/svg%3E");
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 4px rgba(255, 255, 255, 0.7));
-    animation: sparkle 2s ease-in-out infinite 0.7s;
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  @keyframes sparkle {
-    0%, 100% {
-      opacity: 0.6;
-      transform: scale(0.7) rotate(0deg);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.3) rotate(180deg);
-    }
-  }
-
   /* Tooltip - appears below icons */
   .nav-tooltip {
     position: absolute;
@@ -733,39 +695,6 @@
   }
 
 
-  /* Only the right group has shrunk in this range: ((12 + 112) - (24 + 84)) / 2 */
-  @media (min-width: 601px) and (max-width: 768px) {
-    .nav-links-center {
-      left: calc(50% - 8px);
-    }
-  }
-
-  /* Mobile responsive */
-  @media (max-width: 600px) {
-    .nav-links {
-      top: 12px;
-      gap: 8px;
-    }
-
-    .nav-links-left {
-      left: 12px;
-    }
-
-    /* Both groups shrink: ((12 + 112) - (12 + 72)) / 2 */
-    .nav-links-center {
-      left: calc(50% - 20px);
-    }
-
-    .nav-icon {
-      width: 32px;
-      height: 32px;
-    }
-
-    .nav-icon svg {
-      width: 18px;
-      height: 18px;
-    }
-  }
 
   /* Rate limit warning badge on call button */
   .rate-limit-badge {
@@ -1037,13 +966,117 @@
       --scene-w: 100vw;
     }
 
-    /* Vertically center the scene instead of the fixed desktop offset */
-    .frame-container {
-      margin-top: 0;
+    /* Stack the home page: video on top, labeled buttons underneath
+       (hover tooltips don't work on touch, so the labels are always visible) */
+    body.home {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: auto;
       min-height: 100vh;
       min-height: 100svh;
-      justify-content: center;
+      padding-bottom: calc(32px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+    }
+
+    .frame-container {
+      order: -1;
+      margin-top: 0;
       transition: opacity 0.4s ease;
+    }
+
+    .home .nav-links,
+    .home .social-links {
+      position: static;
+      transform: none;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: min(100% - 32px, 420px);
+      margin-top: 10px;
+    }
+
+    .home .nav-links-left {
+      grid-template-columns: repeat(2, 1fr);
+      margin-top: 24px;
+    }
+
+    .ai-disclaimer {
+      display: none;
+    }
+
+    /* Hidden during chat/calls: remove from the flow so the call controls sit right under the video */
+    .home .nav-links.nav-links-hidden,
+    .home .social-links.social-links-hidden {
+      display: none;
+    }
+
+    .home .nav-icon,
+    .home .social-link {
+      flex-direction: column;
+      gap: 6px;
+      width: auto;
+      height: auto;
+      min-height: 68px;
+      padding: 10px 6px;
+      border-radius: 12px;
+      box-sizing: border-box;
+    }
+
+    /* Chat & Call are the main actions: icon beside the label */
+    .home .nav-links-left .nav-icon {
+      flex-direction: row;
+      gap: 10px;
+      min-height: 56px;
+    }
+
+    /* Socials are secondary: lighter tiles */
+    .home .social-link {
+      background: rgba(139, 115, 85, 0.14);
+      color: #6b5344;
+      backdrop-filter: none;
+    }
+
+    .home .nav-icon:hover,
+    .home .social-link:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .home .nav-icon svg,
+    .home .social-link svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    /* Turn the hover tooltips into always-visible labels */
+    .home .nav-tooltip,
+    .home .social-link-tooltip {
+      display: block;
+      position: static;
+      transform: none;
+      opacity: 1;
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.2;
+      white-space: normal;
+      text-align: center;
+    }
+
+    /* Scale down slightly on narrow phones so "Open Chat (AI)" stays on one line */
+    .home .nav-links-left .nav-tooltip {
+      font-size: clamp(13px, 3.8vw, 15px);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .home .nav-tooltip::before,
+    .home .social-link-tooltip::before {
+      display: none;
     }
 
     /* Chat takes the full screen, so just fade the scene out behind it */
@@ -1087,25 +1120,6 @@
       top: 56px;
       left: 12px;
       right: 12px;
-    }
-  }
-
-  /* Very narrow phones - tighten top bar so the three icon groups don't collide */
-  @media (max-width: 360px) {
-    .nav-links,
-    .social-links {
-      gap: 6px;
-    }
-
-    .nav-icon,
-    .social-link {
-      width: 30px;
-      height: 30px;
-    }
-
-    /* ((12 + 102) - (12 + 66)) / 2 */
-    .nav-links-center {
-      left: calc(50% - 18px);
     }
   }
 
@@ -2015,6 +2029,39 @@
 
   .carousel-btn:active {
     transform: scale(0.95);
+  }
+
+  /* First/last card: arrow stays in place but is clearly inactive */
+  .carousel-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  /* Let the page scroll vertically; horizontal swipes are handled in JS */
+  .carousel-3d {
+    touch-action: pan-y;
+  }
+
+  .carousel-dots {
+    display: flex;
+    gap: 8px;
+  }
+
+  .carousel-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: rgba(139, 115, 85, 0.3);
+    cursor: pointer;
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+
+  .carousel-dot.active {
+    width: 22px;
+    background: #8b7355;
   }
 
   /* Mobile Responsive - Projects */
