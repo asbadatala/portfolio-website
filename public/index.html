@@ -1745,16 +1745,29 @@
         // Initialize playback context (needs user gesture)
         initPlaybackContext();
         
-        // Get Deepgram token first
+        // Fetch Deepgram token in parallel with the mic request so the
+        // permission prompt appears immediately instead of after the round trip
         console.log('Getting Deepgram token...');
-        deepgramToken = await getDeepgramToken();
-        scheduleTokenRefresh();
-        console.log('Token received');
-        
+        let tokenReceivedAt = 0;
+        const tokenPromise = getDeepgramToken().then(key => {
+          tokenReceivedAt = Date.now();
+          return key;
+        });
+        tokenPromise.catch(() => {}); // Avoid unhandled rejection if mic fails first
+
         // Request microphone permission
         console.log('Requesting microphone permission...');
         await startRecording();
         console.log('Microphone access granted');
+
+        deepgramToken = await tokenPromise;
+        // Token has a 60s TTL; re-mint if the user sat on the permission prompt
+        if (Date.now() - tokenReceivedAt > 40000) {
+          console.log('Token went stale during permission prompt, refreshing...');
+          deepgramToken = await getDeepgramToken();
+        }
+        scheduleTokenRefresh();
+        console.log('Token received');
         
         // Connect to Deepgram STT
         console.log('Connecting to speech recognition...');
