@@ -77,6 +77,21 @@
 
     </div>
 
+    <!-- Carousel navigation: arrows + position dots (cards can also be swiped on touch) -->
+    <div class="carousel-nav">
+      <button class="carousel-btn" id="carousel-prev" aria-label="Previous project">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="carousel-dots" id="carousel-dots"></div>
+      <button class="carousel-btn" id="carousel-next" aria-label="Next project">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M9 18l6-6-6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+
   </div>
 
   <!-- Video Modal -->
@@ -99,9 +114,31 @@
     // Carousel state for toggling between visible cards
     const carousel = document.getElementById('carousel');
     const cards = carousel.querySelectorAll('.carousel-card');
+    const prevBtn = document.getElementById('carousel-prev');
+    const nextBtn = document.getElementById('carousel-next');
+    const dotsContainer = document.getElementById('carousel-dots');
     let activeIndex = 0;
 
+    // One dot per card; tapping a dot jumps to that card
+    const dots = [...cards].map((_, i) => {
+      const dot = document.createElement('button');
+      dot.className = 'carousel-dot';
+      dot.setAttribute('aria-label', `Go to project ${i + 1}`);
+      dot.addEventListener('click', () => goTo(i));
+      dotsContainer.appendChild(dot);
+      return dot;
+    });
+
+    function goTo(index) {
+      activeIndex = Math.max(0, Math.min(cards.length - 1, index));
+      updateCarousel();
+    }
+
     function updateCarousel() {
+      prevBtn.disabled = activeIndex === 0;
+      nextBtn.disabled = activeIndex === cards.length - 1;
+      dots.forEach((dot, i) => dot.classList.toggle('active', i === activeIndex));
+
       cards.forEach((card, i) => {
         card.classList.remove('active', 'prev', 'next', 'far-prev', 'far-next');
         if (i === activeIndex) {
@@ -131,6 +168,31 @@
           updateCarousel();
         }
       });
+    });
+
+    prevBtn.addEventListener('click', () => goTo(activeIndex - 1));
+    nextBtn.addEventListener('click', () => goTo(activeIndex + 1));
+
+    // Arrow keys on desktop
+    document.addEventListener('keydown', (e) => {
+      if (videoModal.classList.contains('active')) return;
+      if (e.key === 'ArrowLeft') goTo(activeIndex - 1);
+      if (e.key === 'ArrowRight') goTo(activeIndex + 1);
+    });
+
+    // Swipe left/right on touch screens (vertical swipes still scroll the page)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    carousel.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    carousel.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+        goTo(activeIndex + (dx < 0 ? 1 : -1));
+      }
     });
 
     // Video Modal Functionality
