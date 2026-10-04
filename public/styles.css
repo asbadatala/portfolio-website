@@ -1009,12 +1009,95 @@
     color: #5c4d3d;
   }
 
+  /* Mobile Responsive - Home (scene + chat) */
+  @media (max-width: 768px) {
+    :root {
+      --scene-w: 100vw;
+    }
+
+    /* Vertically center the scene instead of the fixed desktop offset */
+    .frame-container {
+      margin-top: 0;
+      min-height: 100vh;
+      min-height: 100svh;
+      justify-content: center;
+      transition: opacity 0.4s ease;
+    }
+
+    /* Chat takes the full screen, so just fade the scene out behind it */
+    .frame-container.chat-open {
+      transform: none;
+      opacity: 0;
+    }
+
+    .chat-panel {
+      right: -100vw;
+      width: 100vw;
+      border-left: none;
+      box-shadow: none;
+    }
+
+    .chat-messages {
+      padding: 60px 12px 120px 12px;
+    }
+
+    .chat-message,
+    .message-loading {
+      gap: 12px;
+      padding: 14px 16px;
+    }
+
+    .message-avatar {
+      width: 30px;
+      height: 30px;
+    }
+
+    .message-content {
+      font-size: 15px;
+      padding-top: 3px;
+    }
+
+    .chat-input-area {
+      padding: 16px 12px calc(16px + env(safe-area-inset-bottom)) 12px;
+    }
+
+    .rate-limit-toast {
+      top: 56px;
+      left: 12px;
+      right: 12px;
+    }
+  }
+
+  /* Very narrow phones - tighten top bar so the three icon groups don't collide */
+  @media (max-width: 360px) {
+    .nav-links,
+    .social-links {
+      gap: 6px;
+    }
+
+    .nav-icon,
+    .social-link {
+      width: 30px;
+      height: 30px;
+    }
+  }
+
+  /* Touch devices: hover tooltips stick after a tap, so hide them */
+  @media (hover: none) {
+    .nav-tooltip,
+    .social-link-tooltip {
+      display: none;
+    }
+  }
+
   /* ================================================
      BLOG PAGE STYLES
      ================================================ */
 
   .blog-page {
     display: block;
+    /* Undo body's place-items: in block layout it shrink-wraps children to their content width */
+    place-items: normal;
     min-height: 100vh;
     padding: 80px 24px 80px;
     box-sizing: border-box;
@@ -1501,6 +1584,12 @@
     .blog-post-content h2 {
       font-size: 22px;
     }
+
+    /* Let wide tables scroll horizontally instead of stretching the page */
+    .blog-post-content table {
+      display: block;
+      overflow-x: auto;
+    }
   }
 
   /* ================================================
@@ -1509,6 +1598,7 @@
 
   .projects-page {
     display: block;
+    place-items: normal;
     min-height: 100vh;
     padding: 80px 24px 80px;
     box-sizing: border-box;
@@ -1951,8 +2041,10 @@
       font-size: 17px;
     }
 
+    /* Side cards poke past the screen edge; clip them so the page doesn't scroll sideways */
     .carousel-3d {
       height: 400px;
+      overflow-x: clip;
     }
 
     .carousel-card {

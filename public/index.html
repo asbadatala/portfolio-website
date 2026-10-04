@@ -281,7 +281,8 @@
       if (socialLinks) socialLinks.classList.add('social-links-hidden');
       if (navLinksCenter) navLinksCenter.classList.add('nav-links-hidden');
       if (navLinksLeft) navLinksLeft.classList.add('nav-links-hidden');
-      chatInput.focus();
+      // On touch devices, focusing pops the keyboard over the welcome message
+      if (!window.matchMedia('(hover: none)').matches) chatInput.focus();
     }
 
     function closeChat() {
