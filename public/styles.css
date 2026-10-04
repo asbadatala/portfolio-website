@@ -2031,6 +2031,13 @@
     transform: scale(0.95);
   }
 
+  /* Arrows are mobile-only; on desktop the side cards are clicked directly */
+  @media (min-width: 769px) {
+    .carousel-btn {
+      display: none;
+    }
+  }
+
   /* First/last card: arrow stays in place but is clearly inactive */
   .carousel-btn:disabled {
     opacity: 0.35;
